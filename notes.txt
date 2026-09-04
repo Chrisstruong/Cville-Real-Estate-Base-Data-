@@ -1,0 +1,23 @@
+FastAPI
+   ↓
+ai_reader
+   ↓ SELECT 
+PostgreSQL
+   ↑
+INSERT / UPDATE / DELETE ❌
+
+
+GRANT CONNECT ON DATABASE charlottesville_real_estate TO ai_reader;: Allow ai_reader to connect to charlottesville_real_estate
+
+GRANT USAGE ON SCHEMA public TO ai_reader;: allow access to public schema
+
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO ai_reader;: Allow to read all existing tables in public schema
+
+1. grant access to DATABASE
+2. grant access to what type of schema
+3. grant access to tables in the schema
+
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT SELECT ON TABLES TO ai_reader;: Let ai_reader access to future tables in the schema
+
