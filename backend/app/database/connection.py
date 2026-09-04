@@ -1,7 +1,8 @@
-from psy.copg.conninfo import make_conninfo
+from psycopg.conninfo import make_conninfo
 from psycopg_pool import AsyncConnectionPool
 
 from app.config import settings
+
 
 conninfo = make_conninfo(
     host=settings.db_host,
@@ -11,10 +12,10 @@ conninfo = make_conninfo(
     password=settings.db_password,
 )
 
+
 pool = AsyncConnectionPool(
     conninfo=conninfo,
     min_size=1,
     max_size=5,
     open=False,
 )
-

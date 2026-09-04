@@ -1,5 +1,5 @@
-# Config file provides backend security. It enscript information in .env file
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     db_host: str
@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     db_password: str
 
     model_config = SettingsConfigDict(
-        env_file = ".env"
+        env_file=".env",
         env_file_encoding="utf-8",
     )
+
 
 settings = Settings()
