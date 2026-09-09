@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from psycopg.rows import dict_row # Return query results as dictionary-like rows
 
 from app.database.connection import pool
@@ -44,4 +45,38 @@ async def database_health():
     return {
         "status": "ok",
         "property_count": result["property_count"],
+    }
+
+@app.get("/api/properties")
+async def get_properties (
+    limit: Annotated[int, Query(ge=1, le=100)] = 2,
+):
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory = dict_row) as cursor:
+            await cursor.execute(
+                """
+                SELECT
+                    record_id,
+                    parcel_number,
+                    street_number,
+                    street_name,
+                    unit,
+                    state_code,
+                    tax_type,
+                    zone, 
+                    tax_dist,
+                    legal,
+                    acreage,
+                    gpin
+                FROM real_estate
+                ORDER BY record_id
+                LIMIT %s;
+                """,
+                (limit,),
+            )
+            properties = await cursor.fetchall()
+
+    return {
+        "count": len(properties),
+        "properties": properties,
     }
