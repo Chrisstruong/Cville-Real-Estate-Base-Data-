@@ -1,4 +1,5 @@
-# this files contain queries for psycopg
+# Database query functions that can later be exposed to the AI agent as tools
+# queries for psycopg to access the database
 
 from psycopg.rows import dict_row
 

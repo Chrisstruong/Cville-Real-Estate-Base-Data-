@@ -22,4 +22,3 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT SELECT ON TABLES TO ai_reader;: Let ai_reader access to future tables in the schema
 
 
-

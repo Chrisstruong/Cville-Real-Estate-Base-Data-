@@ -52,9 +52,11 @@ async def database_health():
     }
 
 # Send requests -> /services/properties.py/fetch_properties -> database/queries.py/get_properties
+# Annotated let add extra information to parameters
 @app.get("/api/properties/")
 async def get_properties_endpoint(
-    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    # define fastAPI parameters for limit
+    limit: Annotated[int, Query(ge=1, le=100)] = 10, # integer, 1 <= queries <= 100, default value is 10
 ):
     return await fetch_properties(limit)
 

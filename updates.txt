@@ -3,3 +3,19 @@ the architecture is fastAPIroute in main.py -> service function -> database quer
 
 09/09/26 at 9:18am
 add functions to find the largest_properties. fastAPI route in main.py -> /service/properties/largest_properties -> /database/queries.py/ get_largest_properties
+
+09/09/26 at 9:56am
+How psycopg works:
+Psycopg
+   ↓
+pool(/database/connection.py)
+   ↓
+conn (database connection)
+   ↓
+conn.cursor()
+   ↓
+cursor
+   ↓
+cursor.execute(SQL)
+   ↓
+PostgreSQL
