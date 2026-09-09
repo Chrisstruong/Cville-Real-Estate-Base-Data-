@@ -5,6 +5,7 @@ from fastapi import FastAPI, Query
 from psycopg.rows import dict_row # Return query results as dictionary-like rows
 
 from app.database.connection import pool
+from app.services.properties import fetch_properties
 
 # Manage the database connection pool during the application's lifespan
 @asynccontextmanager
@@ -47,36 +48,8 @@ async def database_health():
         "property_count": result["property_count"],
     }
 
-@app.get("/api/properties")
-async def get_properties (
-    limit: Annotated[int, Query(ge=1, le=100)] = 2,
+@app.get("/api/properties/")
+async def get_properties_endpoint(
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ):
-    async with pool.connection() as conn:
-        async with conn.cursor(row_factory = dict_row) as cursor:
-            await cursor.execute(
-                """
-                SELECT
-                    record_id,
-                    parcel_number,
-                    street_number,
-                    street_name,
-                    unit,
-                    state_code,
-                    tax_type,
-                    zone, 
-                    tax_dist,
-                    legal,
-                    acreage,
-                    gpin
-                FROM real_estate
-                ORDER BY record_id
-                LIMIT %s;
-                """,
-                (limit,),
-            )
-            properties = await cursor.fetchall()
-
-    return {
-        "count": len(properties),
-        "properties": properties,
-    }
+    return await fetch_properties(limit)
