@@ -21,3 +21,5 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO ai_reader;: Allow to read all exi
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT SELECT ON TABLES TO ai_reader;: Let ai_reader access to future tables in the schema
 
+
+

@@ -5,7 +5,10 @@ from fastapi import FastAPI, Query
 from psycopg.rows import dict_row # Return query results as dictionary-like rows
 
 from app.database.connection import pool
-from app.services.properties import fetch_properties
+from app.services.properties import (
+    fetch_properties,
+    fetch_largest_properties,
+)
 
 # Manage the database connection pool during the application's lifespan
 @asynccontextmanager
@@ -48,8 +51,19 @@ async def database_health():
         "property_count": result["property_count"],
     }
 
+# Send requests -> /services/properties.py/fetch_properties -> database/queries.py/get_properties
 @app.get("/api/properties/")
 async def get_properties_endpoint(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ):
     return await fetch_properties(limit)
+
+@app.get("/api/properties/largest")
+async def largest_properties(
+    limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    tax_type: str | None = None,
+):
+    return await fetch_largest_properties(
+        limit=limit,
+        tax_type=tax_type
+    )

@@ -1,2 +1,8 @@
 8:36am on 09/09/2026:
 query is not defined. It was a type. Should be Query
+
+9:24 on 09/09/2026:
+get_largest_properties is not defined even though it is already defined in queries.py. 
+Fixed by:
++ adding from app.database.queries import get_largest_properties because I fogot to import 
++ fixed the syntax LIMIT %s, to LIMIT %s;

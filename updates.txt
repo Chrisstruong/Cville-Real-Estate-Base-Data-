@@ -1,0 +1,5 @@
+09/09/26 at 9:07am
+the architecture is fastAPIroute in main.py -> service function -> database query function -> PostgreSQL(database)
+
+09/09/26 at 9:18am
+add functions to find the largest_properties. fastAPI route in main.py -> /service/properties/largest_properties -> /database/queries.py/ get_largest_properties

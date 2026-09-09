@@ -1,4 +1,4 @@
-# This is where the agent model has access to
+# this files contain queries for psycopg
 
 from psycopg.rows import dict_row
 
@@ -30,3 +30,47 @@ async def get_properties(limit: int = 20):
             )
             
             return await cursor.fetchall()
+        
+async def get_largest_properties(
+    limit: int = 5,
+    tax_type: str | None = None,
+):
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            
+            if tax_type:
+                await cursor.execute(
+                    """
+                    SELECT
+                        record_id,
+                        parcel_number,
+                        street_number,
+                        street_name,
+                        acreage,
+                        zone,
+                        tax_type
+                    FROM real_estate
+                    WHERE tax_type = %s
+                    ORDER BY acreage DESC
+                    LIMIT %s;
+                    """,
+                    (tax_type, limit),
+                )
+            else:
+                await cursor.execute(
+                    """
+                    SELECT 
+                        record_id,
+                        parcel_number,
+                        street_number,
+                        street_name,
+                        acreage,
+                        zone,
+                        tax_type
+                    FROM real_estate
+                    ORDER BY acreage DESC
+                    LIMIT %s;
+                    """,
+                    (limit,),  
+                )
+                return await cursor.fetchall()
