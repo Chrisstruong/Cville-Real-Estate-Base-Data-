@@ -20,7 +20,16 @@ async def fetch_largest_properties(
         limit=limit,
         tax_type=tax_type,
     )
+    cleaned_properties = []
+    for property in properties:
+        item = dict(property)
+        
+        if item["acreage"] is not None:
+            item["acreage"] = float(item["acreage"])
+        
+        cleaned_properties.append(item)
+        
     return {
-        "count": len(properties),
-        "properties": properties,
+        "count": len(cleaned_properties),
+        "properties": cleaned_properties,
     }

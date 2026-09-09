@@ -74,4 +74,5 @@ async def get_largest_properties(
                     """,
                     (limit,),  
                 )
-                return await cursor.fetchall()
+            properties = await cursor.fetchall()   
+            return properties
