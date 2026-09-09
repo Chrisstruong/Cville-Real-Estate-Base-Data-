@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     db_name: str
     db_user: str
     db_password: str
+    
+    openai_api_key: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
