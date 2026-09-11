@@ -15,8 +15,8 @@ async def main():
             real_estate_agent,
             "What are the 5 largest tax-exempt properties?",
         )
-        
-        print(results.final_output)
+        # final_output comes from the object returned by Runner.run(...) in the openAI SDK
+        print(results.final_output) # Return the agent's response text after it finishes reasoning and calling any tools it needs
     
     finally:
         await pool.close()

@@ -1,8 +1,44 @@
 8:36am on 09/09/2026:
 query is not defined. It was a type. Should be Query
+______________________________________________
 
+
+____________________
 9:24 on 09/09/2026:
 get_largest_properties is not defined even though it is already defined in queries.py. 
 Fixed by:
 + adding from app.database.queries import get_largest_properties because I fogot to import 
 + fixed the syntax LIMIT %s, to LIMIT %s;
+______________________________________________
+
+
+____________________
+11:48am on 09/09/26:
+PostgreSQL async loop issue on Windows
+Fixed by adding asyncio.run(
+        main(),
+        loop_factory=asyncio.SelectorEventLoop
+    )
+OpenAI API key not actually loaded into the environment
+Fixed by adding
+from app.config import settings
+
+set_default_openai_key(settings.openai_api_key)
+______________________________________________
+
+____________________
+12:06pm on 09/09/26:
+queries get_largest_properties didn't work properly because it returns none
+Fixed: by stores await cursor.fetchall() in properties variables and enhance the indentation
+______________________________________________
+
+____________________
+12:09pm on 09/09/26:
+Error: "I couldn’t retrieve the property data due to a database tool error. Please try again."
+Debugging: agent tool results need to be serialized into data the OpenAI SDK can send, and Decimal often causes serialization problems.
+Convert acreage to normal float.
+______________________________________________
+
+
+
+
