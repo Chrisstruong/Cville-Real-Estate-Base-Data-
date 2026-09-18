@@ -19,3 +19,68 @@ cursor
 cursor.execute(SQL)
    ↓
 PostgreSQL
+
+
+09/18/2026 at 9:44am
+POST: /api/chat
+   ↓
+real_estate_agent.py
+   ↓
+property_tool.py       ← add cap here now
+   ↓
+services/properties.py ← add second cap next
+   ↓
+database/queries.py
+   ↓
+PostgreSQL
+
+
+09/18/2026 at 11:45am
+/api/chat
+    ↓
+Runner.run(...)
+    ↓
+RequestContext
+    ↓
+RunContextWrapper
+    ↓
+property tool
+
+Checkpoint 7D — output/token protection
+This should be next. We’ll again do a deliberately bad version first, then improve it.
+The focus will be:
+- cap model output size
+- keep responses concise
+- prevent the agent from dumping unnecessary raw data
+- measure input/output tokens
+- compare the old 59,720-token failure against protected requests
+- calculate actual token reduction percentages
+
+Checkpoint 7E — full guardrail evaluation
+We’ll build a proper test suite covering:
+- normal requests
+- 20
+- 21
+- 100
+- 1000
+- 5000
+- “all properties”
+- multi-call bypass attempts
+- invalid input
+- unsupported queries
+- write-operation attempts
+Then calculate final metrics like:
+- limit compliance rate
+- request-level guardrail success rate
+- blocked-bypass rate
+- tool accuracy
+- latency
+- token usage
+- cost/query
+Checkpoint 8: streaming responses
+Checkpoint 9: citations/source grounding
+Checkpoint 10: React chat UI
+Checkpoint 11: additional real-estate tools
+Checkpoint 12: security hardening
+Checkpoint 13: deployment
+Checkpoint 14: monitoring/production metrics

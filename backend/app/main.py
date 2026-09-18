@@ -8,6 +8,8 @@ from agents import set_default_openai_key
 from app.config import settings
 from app.services.agent_service import run_real_estate_agent
 
+from pydantic import BaseModel, Field, field_validator
+
 from pydantic import (
     BaseModel,
     Field,
@@ -88,8 +90,19 @@ async def largest_properties(
 
 class ChatRequest(BaseModel):
     message: str = Field(
-        min_length=1, max_length=2000
-    )  # if the request is blank, return error
+        min_length=1,
+        max_length=2000,
+    )
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Message cannot be empty.")
+
+        return value
 
 
 @app.post("/api/chat")
