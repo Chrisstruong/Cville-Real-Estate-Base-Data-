@@ -6,6 +6,8 @@ from openai.types.responses import ResponseTextDeltaEvent
 from app.context import RequestContext
 from app.ai_agents.real_estate_agent import real_estate_agent
 
+import time
+
 
 async def run_real_estate_agent(message: str) -> str:
     request_context = RequestContext()
@@ -31,6 +33,9 @@ async def run_real_estate_agent(message: str) -> str:
 async def stream_real_estate_agent(message: str) -> AsyncIterator[str]:
     request_context = RequestContext()
 
+    start_time = time.perf_counter()
+    first_token_time = None
+
     result = Runner.run_streamed(
         real_estate_agent,
         message,
@@ -41,8 +46,13 @@ async def stream_real_estate_agent(message: str) -> AsyncIterator[str]:
         if event.type == "raw_response_event" and isinstance(
             event.data, ResponseTextDeltaEvent
         ):
+            # MEasure TTFT only once:
+            if first_token_time is None:
+                first_token_time = time.perf_counter() - start_time
+
             yield event.data.delta
 
+    total_time = time.perf_counter() - start_time
     usage = result.context_wrapper.usage
 
     print("\n===== STREAMING AGENT USAGE ======")
@@ -51,3 +61,9 @@ async def stream_real_estate_agent(message: str) -> AsyncIterator[str]:
     print("Output tokens:", usage.output_tokens)
     print("Total tokens:", usage.total_tokens)
     print("==================================\n")
+
+    if first_token_time is not None:
+        print(f"Time to first token: {first_token_time: .3f}s")
+
+    print(f"Total streaming time: {total_time:.3f}s")
+    print("===========\n")

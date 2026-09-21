@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import FastAPI, Query
 from psycopg.rows import dict_row  # Return query results as dictionary-like rows
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from agents import set_default_openai_key
 from app.config import settings
@@ -41,6 +42,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Charlottesville Real Estate AI API",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
