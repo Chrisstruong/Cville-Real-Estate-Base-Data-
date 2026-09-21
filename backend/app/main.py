@@ -3,16 +3,18 @@ from typing import Annotated
 
 from fastapi import FastAPI, Query
 from psycopg.rows import dict_row  # Return query results as dictionary-like rows
+from fastapi.responses import StreamingResponse
 
 from agents import set_default_openai_key
 from app.config import settings
-from app.services.agent_service import run_real_estate_agent
+from app.services.agent_service import run_real_estate_agent, stream_real_estate_agent
 
-from pydantic import BaseModel, Field, field_validator
+import time
 
 from pydantic import (
     BaseModel,
     Field,
+    field_validator,
 )  # FastAPI use Basemodel to define and validate structured request
 
 from app.database.connection import pool
@@ -107,6 +109,23 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
+    start_time = time.perf_counter()
     answer = await run_real_estate_agent(request.message)
 
-    return {"answer": answer}
+    total_time = time.perf_counter() - start_time
+
+    print("\n======= CHAT BASELINE ======")
+    print(f"Total response time: {total_time:.3f}s")
+    print("==========\n")
+
+    return {
+        "answer": answer,
+        "total_time_seconds": round(total_time, 3),
+    }
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    return StreamingResponse(
+        stream_real_estate_agent(request.message), media_type="text/plain"
+    )
