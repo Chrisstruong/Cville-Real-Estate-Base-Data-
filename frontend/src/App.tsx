@@ -14,6 +14,8 @@ function App() {
       return;
     }
 
+    console.log("User message: ", message)
+
     setResponse("");
     setIsLoading(true);
     try {
