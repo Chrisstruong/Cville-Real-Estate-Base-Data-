@@ -2,6 +2,8 @@
 backend/.venv/
 __pycache__/
 *.pyc
+*.py[cod]
+
 
 # Environment variables
 .env
@@ -17,3 +19,7 @@ frontend/.next/
 
 # Local datasets
 data/*.csv
+
+
+node_modules/
+dist/
