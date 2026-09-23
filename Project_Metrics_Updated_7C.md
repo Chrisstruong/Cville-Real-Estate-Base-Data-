@@ -1101,3 +1101,140 @@ Implemented layered AI-agent result-size guardrails after reproducing a multi-ca
 \- Whitespace-only invalid input: **\*\*HTTP 422, 0 agent/tool/database executions\*\***
 
 \- Checkpoint 7C status: **\*\*COMPLETE\*\***
+
+CHECKPOINT 8 — NON-STREAMING BASELINE
+
+Prompt:
+"Give me the 5 largest taxable properties"
+
+Runs:                 5
+Average latency:      4.262 s
+Median latency:       3.758 s
+Min latency:          3.035 s
+Max latency:          7.610 s
+Warm avg (runs 2–5):  3.425 s
+LLM requests:         2/request
+Average tokens:       ~865/request
+TTFT:                 Not observable
+
+### Browser Integration Tests
+
+| Test | Result |
+|---|---|
+| Normal streaming response | PASS |
+| Empty input blocked | PASS |
+| Duplicate submission blocked | PASS |
+| Backend failure handled | PASS |
+| 100-property guardrail test | PASS |
+
+### Guardrail Stress Test
+
+Prompt requested 100 taxable properties.
+
+- Returned properties: 20
+- Successful tool calls: 1
+- LLM requests: 2
+- Input tokens: 1,710
+- Output tokens: 412
+- Total tokens: 2,122
+- Time to first streamed text: 4.226s
+- Total streaming time: 6.809s
+
+The backend-enforced 20-property cap remained effective when
+the request originated from the React frontend.
+
+
+## Checkpoint 8 - Streaming Responses
+
+### Goal
+
+Improve perceived response latency by streaming agent-generated text
+from FastAPI to the React frontend instead of waiting for the complete
+agent response.
+
+### Implementation
+
+- Added OpenAI Agents SDK streaming with `Runner.run_streamed()`
+- Consumed `ResponseTextDeltaEvent` events
+- Added FastAPI `/api/chat/stream` endpoint
+- Preserved `/api/chat` as the non-streaming baseline
+- Added React + TypeScript frontend using Vite
+- Configured FastAPI CORS for the local frontend
+- Consumed the HTTP stream using `ReadableStream.getReader()`
+- Progressively rendered streamed text in React
+- Added loading and error states
+
+### Controlled Test
+
+Prompt:
+
+`Give me the 5 largest taxable properties`
+
+Five runs were collected for both implementations.
+
+| Metric | Non-streaming | Streaming |
+|---|---:|---:|
+| Runs | 5 | 5 |
+| Average total time | 4.262s | 3.698s |
+| Median total time | 3.758s | 3.552s |
+| Minimum total time | 3.035s | 3.253s |
+| Maximum total time | 7.610s | 4.263s |
+| Warm non-streaming average | 3.425s | - |
+| Average time to first streamed text | N/A | 2.629s |
+| Average tokens | 865.0 | 862.6 |
+| LLM requests per request | 2 | 2 |
+
+### Interpretation
+
+Streaming primarily improved perceived latency rather than backend
+processing speed.
+
+The streaming implementation began delivering generated text after an
+average of 2.629 seconds while completing in an average of 3.698
+seconds.
+
+Overall completion time, token usage, and LLM request count remained
+similar between the streaming and non-streaming implementations.
+
+The non-streaming average included a 7.610-second outlier. Therefore,
+the difference in average total completion time should not be
+interpreted as evidence that streaming made agent execution faster.
+
+### Browser Integration Tests
+
+- Normal response streamed progressively: PASS
+- Empty input blocked before API request: PASS
+- Duplicate submission blocked while generating: PASS
+- Backend connection failure handled by UI: PASS
+- Backend result guardrail preserved through frontend: PASS
+
+### Guardrail Stress Test
+
+A frontend request asked for 100 taxable properties.
+
+Results:
+
+- Maximum returned properties: 20
+- Successful property tool calls: 1
+- LLM requests: 2
+- Input tokens: 1,710
+- Output tokens: 412
+- Total tokens: 2,122
+- Time to first streamed text: 4.226s
+- Total streaming time: 6.809s
+
+The server-side 20-property restriction remained effective when the
+request originated from the React frontend.
+
+### Conclusion
+
+The streaming pipeline works end-to-end:
+
+React → FastAPI → OpenAI Agents SDK → Function Tool → PostgreSQL
+
+and:
+
+PostgreSQL → Agent → text deltas → FastAPI StreamingResponse
+→ ReadableStream → progressive React rendering.
+
+Checkpoint 8 complete.
