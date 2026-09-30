@@ -71,7 +71,7 @@ async def database_health():
         ) as cursor:  # cursor lets excute sql queries
             await cursor.execute("""
                 SELECT COUNT(*) AS property_count
-                FROM real_estate;
+                FROM real_estate_current_assessment;
                 """)
 
             result = await cursor.fetchone()  # Store response from SQL queries
@@ -97,9 +97,10 @@ async def get_properties_endpoint(
 @app.get("/api/properties/largest")
 async def largest_properties(
     limit: Annotated[int, Query(ge=1, le=20)] = 5,
-    tax_type: str | None = None,
 ):
-    return await fetch_largest_properties(limit=limit, tax_type=tax_type)
+    return await fetch_largest_properties(
+        limit=limit,
+    )
 
 
 class ChatRequest(BaseModel):
@@ -141,3 +142,15 @@ async def chat_stream(request: ChatRequest):
     return StreamingResponse(
         stream_real_estate_agent(request.message), media_type="text/plain"
     )
+
+
+@app.get("/api/test-property-street")
+async def test_property_street(street_name: str):
+    from app.services.crime_service import property_street_has_crime
+    from app.utils.street_normalizer import normalize_street_name
+
+    return {
+        "st_name": street_name,
+        "normalized_street": normalize_street_name(street_name),
+        "has_crime_records": await property_street_has_crime(street_name),
+    }
