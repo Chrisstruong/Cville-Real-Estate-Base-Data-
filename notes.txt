@@ -22,3 +22,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT SELECT ON TABLES TO ai_reader;: Let ai_reader access to future tables in the schema
 
 
+10	Street normalization & matching	🚧
+11	Cross-dataset service/query layer	⬜
+12	Property + crime AI tools	⬜
+13	Geospatial foundation	⬜
+14	MapLibre interactive map	⬜
+15	Statistical analysis	⬜
+16	AI + map + visualization integration	⬜
+17	Final evaluation, security & polish

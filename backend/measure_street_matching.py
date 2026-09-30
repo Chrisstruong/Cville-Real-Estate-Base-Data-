@@ -2,7 +2,10 @@ import asyncio
 import sys
 
 from app.database.connection import pool
-from app.utils.street_normalizer import normalize_street_name
+from app.utils.street_normalizer import (
+    normalize_street_name,
+    extract_streets,
+)
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -30,7 +33,7 @@ async def main():
             """)
         crime_rows = await result.fetchall()
 
-        # Get every property so we can measure property coverage
+        # Get every property
         result = await conn.execute("""
             
             SELECT st_name
@@ -41,14 +44,26 @@ async def main():
 
     await pool.close()
 
+    # real_estate_streets = {"MAIN ST", "OAK ST", "PRESTON AVE"}
     real_estate_streets = {normalize_street_name(row[0]) for row in real_estate_rows}
 
-    crime_streets = {normalize_street_name(row[0]) for row in crime_rows}
+    # crime_streets = {"MAIN ST", "OAK ST", "MARKET ST"}
+    crime_streets = set()
+    for row in crime_rows:
+        streets = extract_streets(row[0])
 
+        for street in streets:
+            crime_streets.add(street)
+
+    # Streets exist in both datasets
     matched_streets = real_estate_streets & crime_streets
-    unmatched_streets = real_estate_streets - crime_streets
+    # Real-estate streets that don't appear in crime data
+    unmatched_real_estate_streets = real_estate_streets - crime_streets
 
-    matched_properties = sum(
+    # Crime streets that don't match a real-estate street
+    unmatched_crime_streets = crime_streets - real_estate_streets
+
+    properties_on_crime_streets = sum(
         1 for row in property_rows if normalize_street_name(row[0]) in crime_streets
     )
 
@@ -56,22 +71,37 @@ async def main():
     total_properties = len(property_rows)
 
     street_match_rate = matched_streets.__len__() / total_streets * 100
-    property_coverage = matched_properties / total_properties * 100
+    # Percentage of properties whose streets appear in crime dataset
+    properties_on_crime_streets_rate = (
+        properties_on_crime_streets / total_properties * 100
+    )
     print("\n===== STREET NORMALIZATION METRICS =====")
     print(f"Real-estate streets: {total_streets}")
     print(f"Matched streets: {len(matched_streets)}")
-    print(f"Unmatched streets: {len(unmatched_streets)}")
+    print(f"Unmatched streets: {len(unmatched_real_estate_streets)}")
     print(f"Street match rate: {street_match_rate:.2f}%")
 
     print("\n===== PROPERTY COVERAGE =====")
     print(f"Total properties: {total_properties}")
-    print(f"Matched properties: {matched_properties}")
-    print(f"Unmatched properties: {total_properties - matched_properties}")
-    print(f"Property coverage: {property_coverage:.2f}%")
+    print(f"Matched properties: {properties_on_crime_streets}")
+    print(f"Unmatched properties: {total_properties - properties_on_crime_streets}")
+    print(f"Property coverage: {properties_on_crime_streets_rate:.2f}%")
 
-    print("\n===== UNMATCHED STREETS =====")
-    for street in sorted(unmatched_streets):
+    print("\n===== UNMATCHED REAL-ESTATE STREETS =====")
+    print(f"Count: {len(unmatched_real_estate_streets)}")
+    for street in sorted(unmatched_real_estate_streets):
         print(street)
+
+    print("\n===== UNMATCHED CRIME STREETS =====")
+    print(f"Count: {len(unmatched_crime_streets)}")
+    for street in sorted(unmatched_crime_streets)[:200]:
+        print(street)
+
+    print(extract_streets("BLENHEIM AVE / 6TH ST SE"))
+    print(extract_streets("EMMET ST/BARRACKS RD"))
+    print(extract_streets("10TH ST/ MAIN ST"))
+    print(extract_streets("10 1/2 ST NW"))
+    print(extract_streets("29/250"))
 
 
 if __name__ == "__main__":
