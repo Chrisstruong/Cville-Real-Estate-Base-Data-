@@ -6,6 +6,7 @@ from app.utils.street_normalizer import (
     normalize_street_name,
     extract_streets,
 )
+from collections import Counter
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -51,7 +52,6 @@ async def main():
     crime_streets = set()
     for row in crime_rows:
         streets = extract_streets(row[0])
-
         for street in streets:
             crime_streets.add(street)
 
@@ -70,7 +70,7 @@ async def main():
     total_streets = len(real_estate_streets)
     total_properties = len(property_rows)
 
-    street_match_rate = matched_streets.__len__() / total_streets * 100
+    street_match_rate = len(matched_streets) / total_streets * 100
     # Percentage of properties whose streets appear in crime dataset
     properties_on_crime_streets_rate = (
         properties_on_crime_streets / total_properties * 100
@@ -97,11 +97,18 @@ async def main():
     for street in sorted(unmatched_crime_streets)[:200]:
         print(street)
 
-    print(extract_streets("BLENHEIM AVE / 6TH ST SE"))
-    print(extract_streets("EMMET ST/BARRACKS RD"))
-    print(extract_streets("10TH ST/ MAIN ST"))
-    print(extract_streets("10 1/2 ST NW"))
-    print(extract_streets("29/250"))
+    unmatched_property_counts = Counter()
+    for row in property_rows:
+        normalized_street = normalize_street_name(row[0])
+
+        if normalized_street not in crime_streets:
+            unmatched_property_counts[normalized_street] += 1
+
+    print("\n===== UNMATCHED PROPERTY DISTRIBUTION =====")
+    print(f"Count: {sum(unmatched_property_counts.values())}")
+
+    for street, count in unmatched_property_counts.most_common():
+        print(f"{street}: {count}")
 
 
 if __name__ == "__main__":
