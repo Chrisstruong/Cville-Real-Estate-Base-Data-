@@ -5,74 +5,52 @@ from psycopg.rows import dict_row
 
 from app.database.connection import pool
 
+
 async def get_properties(limit: int = 20):
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
             await cursor.execute(
                 """
-                SELECT 
-                    record_id,
+                SELECT
                     parcel_number,
-                    street_number,
-                    street_name,
-                    unit,
-                    state_code,
-                    tax_type,
-                    zone,
-                    tax_dist,
-                    legal,
-                    acreage,
-                    gpin
-                FROM real_estate
-                ORDER BY record_id
+                    current_assessed_value,
+                    object_id,
+                    st_number,
+                    st_name,
+                    st_unit,
+                    legal_description,
+                    lot_sqft
+                FROM real_estate_current_assessment
+                ORDER BY parcel_number
                 LIMIT %s;
                 """,
                 (limit,),
             )
-            
+
             return await cursor.fetchall()
-        
+
+
 async def get_largest_properties(
     limit: int = 5,
-    tax_type: str | None = None,
 ):
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            
-            if tax_type:
-                await cursor.execute(
-                    """
-                    SELECT
-                        record_id,
-                        parcel_number,
-                        street_number,
-                        street_name,
-                        acreage,
-                        zone,
-                        tax_type
-                    FROM real_estate
-                    WHERE tax_type = %s
-                    ORDER BY acreage DESC
-                    LIMIT %s;
-                    """,
-                    (tax_type, limit),
-                )
-            else:
-                await cursor.execute(
-                    """
-                    SELECT 
-                        record_id,
-                        parcel_number,
-                        street_number,
-                        street_name,
-                        acreage,
-                        zone,
-                        tax_type
-                    FROM real_estate
-                    ORDER BY acreage DESC
-                    LIMIT %s;
-                    """,
-                    (limit,),  
-                )
-            properties = await cursor.fetchall()   
-            return properties
+            await cursor.execute(
+                """
+                SELECT
+                    parcel_number,
+                    current_assessed_value,
+                    object_id,
+                    st_number,
+                    st_name,
+                    st_unit,
+                    legal_description,
+                    lot_sqft
+                FROM real_estate_current_assessment
+                ORDER BY lot_sqft DESC
+                LIMIT %s;
+                """,
+                (limit,),
+            )
+
+            return await cursor.fetchall()

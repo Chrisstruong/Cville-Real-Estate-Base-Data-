@@ -165,3 +165,33 @@ The main baseline metrics to improve are:
 
 Checkpoint 10 should compare normalized matching against these values
 rather than replacing the baseline.
+
+
+Checkpoint 10.6 — Measure Final Street Matching
+
+Final street-level metrics:
+- Total real-estate streets: 592
+- Matched streets: 544
+- Unmatched streets: 48
+- Street match rate: 91.89%
+
+Final property-level metrics:
+- Total properties: 15,702
+- Matched properties: 15,431
+- Unmatched properties: 271
+- Property coverage: 98.27%
+
+Largest unmatched property groups:
+- MACAA DR: 23
+- GREENBRIER TER: 15
+- CARTER LN: 14
+- MORRIS RD: 13
+- AMHERST CMN: 12
+- SHALE PL: 10
+- BROOK RD: 9
+- MICHAEL PL: 8
+- PLYMOUTH RD: 8
+- FLINT DR: 8
+
+Conclusion:
+Normalization achieves high property coverage while avoiding aggressive or unsafe fuzzy matching. Remaining unmatched streets are relatively distributed and may represent streets with no corresponding crime records rather than normalization failures.
