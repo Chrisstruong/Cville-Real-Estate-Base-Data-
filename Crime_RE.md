@@ -195,3 +195,35 @@ Largest unmatched property groups:
 
 Conclusion:
 Normalization achieves high property coverage while avoiding aggressive or unsafe fuzzy matching. Remaining unmatched streets are relatively distributed and may represent streets with no corresponding crime records rather than normalization failures.
+
+
+Checkpoint 10.7 — Backend Street Normalization Integration
+
+Correctness:
+- Reused normalize_street_name() from the shared normalizer
+- Reused extract_streets() for crime data
+- Added crime_service.py
+- Property service now returns normalized_street
+- Property service now returns has_crime_records
+- Known matched streets correctly return true
+- Known unmatched street service test correctly returns false
+
+Performance — 5 local runs each:
+
+limit=3
+- Average: 33.1 ms
+- Min: 31.2 ms
+- Max: 36.7 ms
+
+limit=10
+- Average: 34.7 ms
+- Min: 31.1 ms
+- Max: 38.1 ms
+
+limit=20
+- Average: 37.3 ms
+- Min: 31.7 ms
+- Max: 48.0 ms
+
+Decision:
+No caching or precomputation added yet because current request latency is already low.

@@ -44,7 +44,7 @@ def normalize_street_name(street_name: str | None) -> str | None:
 
     # Remove crime-data "(CONS)" prefix
     if normalized.startswith("(CONS) "):
-        normalized = normalized[len("(CON) ") :].strip()
+        normalized = normalized[len("(CONS) ") :].strip()
 
     # Crime data someitmes stores unit/sub-location information
     # after a comma, e.g "APPLE TREE RD, A".
