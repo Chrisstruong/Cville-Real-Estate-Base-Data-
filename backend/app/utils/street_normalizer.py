@@ -20,6 +20,15 @@ STREET_ALIASES = {
 }
 
 
+NON_STREET_VALUES = {
+    "UNKNOWN",
+    "<UNKNOWN>",
+    "UNKNOWN ST",
+    "UNKNWON",
+    "UKN ONLINE CRIME",
+}
+
+
 def normalize_street_name(street_name: str | None) -> str | None:
     """
     Normalize a street name for comparison between datasets.
@@ -78,6 +87,9 @@ def normalize_street_name(street_name: str | None) -> str | None:
 
 
 def extract_streets(location: str | None) -> list[str]:
+    if is_non_street_value(location):
+        return []
+
     if location is None:
         return []
 
@@ -113,3 +125,35 @@ def extract_streets(location: str | None) -> list[str]:
         parts = [location]
 
     return [normalize_street_name(part) for part in parts if part.strip()]
+
+
+def is_non_street_value(value: str | None) -> bool:
+    if value is None:
+        return True
+
+    value = value.strip().upper()
+
+    if not value:
+        return True
+
+    # Known missing/unknown values
+    if value in NON_STREET_VALUES:
+        return True
+
+    # Deleted-address markers
+    if value.startswith("DELETED ADDRESS"):
+        return True
+
+    # Longitude/latitude stored as a single number
+    if re.fullmatch(r"-?\d+\.\d+", value):
+        return True
+
+    # Coordinate pair such as:
+    # 38.057383549~-78.495331447
+    if re.fullmatch(
+        r"-?\d+\.\d+\s*~\s*-?\d+\.\d+",
+        value,
+    ):
+        return True
+
+    return False
