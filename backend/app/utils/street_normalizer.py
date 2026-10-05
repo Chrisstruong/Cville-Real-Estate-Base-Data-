@@ -13,6 +13,10 @@ STREET_SUFFIXES = {
 STREET_ALIASES = {
     "CASTALIA EXT ST": "CASTALIA ST EXT",
     "MALCOLM CRESENT": "MALCOLM CRES",
+    # Real-estate naming differences verified against official GIS
+    "250 BYPASS": "250 BYP",
+    "BELMONT PK": "BELMONT PARK",
+    "UNIVERSITY GARDENS": "UNIVERSITY GDNS",
 }
 
 

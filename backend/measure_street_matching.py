@@ -6,7 +6,7 @@ from app.utils.street_normalizer import (
     normalize_street_name,
     extract_streets,
 )
-from collections import Counter
+from collections import defaultdict
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -24,6 +24,21 @@ async def main():
             
             """)
         real_estate_rows = await result.fetchall()
+
+        # Get official Charlottesville GIS streets
+        result = await conn.execute("""
+        SELECT DISTINCT streetname
+        FROM official_cville_road_centerlines
+        WHERE streetname IS NOT NULL
+        AND TRIM(streetname) <> ''
+        """)
+        official_rows = await result.fetchall()
+        # Temporary:
+        """
+        ===== This is why 1 property is missing in the offical cville database  =====
+        Normalized: HILLSDALE DR
+        Raw: ['HILLSDALE DR', 'HILLSDALE DR ']
+        """
 
         # Get unique crime streets
         result = await conn.execute("""
@@ -45,70 +60,119 @@ async def main():
 
     await pool.close()
 
+    # --------------
+    # Normalize datasets: road_centerlines, real estate, and crime streets
+
+    official_streets = {normalize_street_name(row[0]) for row in official_rows}
+
     # real_estate_streets = {"MAIN ST", "OAK ST", "PRESTON AVE"}
     real_estate_streets = {normalize_street_name(row[0]) for row in real_estate_rows}
 
     # crime_streets = {"MAIN ST", "OAK ST", "MARKET ST"}
     crime_streets = set()
-    for row in crime_rows:
-        streets = extract_streets(row[0])
-        for street in streets:
-            crime_streets.add(street)
 
-    # Streets exist in both datasets
+    for row in crime_rows:
+        crime_streets.update(extract_streets(row[0]))
+
+    # ---------------------------------------------------------
+    # Validate against official Charlottesville GIS
+    # ---------------------------------------------------------
+
+    # Real-estate validation against official GIS
+    valid_real_estate_streets = real_estate_streets & official_streets
+    invalid_real_estate_streets = real_estate_streets - official_streets
+
+    for street in sorted(invalid_real_estate_streets):
+        print(street)
+
+    # Crime validation against official GIS
+    valid_crime_streets = crime_streets & official_streets
+    invalid_crime_streets = crime_streets - official_streets
+    real_estate_validity_rate = (
+        len(valid_real_estate_streets) / len(real_estate_streets) * 100
+    )
+
+    crime_validity_rate = len(valid_crime_streets) / len(crime_streets) * 100
+    # ---------------------------------------------------------
+    # Measure overlap between real-estate and crime datasets
+    # ---------------------------------------------------------
+
     matched_streets = real_estate_streets & crime_streets
-    # Real-estate streets that don't appear in crime data
+
     unmatched_real_estate_streets = real_estate_streets - crime_streets
 
-    # Crime streets that don't match a real-estate street
     unmatched_crime_streets = crime_streets - real_estate_streets
+
+    street_match_rate = len(matched_streets) / len(real_estate_streets) * 100
+
+    # ---------------------------------------------------------
+    # Property coverage
+    # ---------------------------------------------------------
 
     properties_on_crime_streets = sum(
         1 for row in property_rows if normalize_street_name(row[0]) in crime_streets
     )
 
-    total_streets = len(real_estate_streets)
     total_properties = len(property_rows)
 
-    street_match_rate = len(matched_streets) / total_streets * 100
-    # Percentage of properties whose streets appear in crime dataset
-    properties_on_crime_streets_rate = (
-        properties_on_crime_streets / total_properties * 100
-    )
-    print("\n===== STREET NORMALIZATION METRICS =====")
-    print(f"Real-estate streets: {total_streets}")
-    print(f"Matched streets: {len(matched_streets)}")
-    print(f"Unmatched streets: {len(unmatched_real_estate_streets)}")
-    print(f"Street match rate: {street_match_rate:.2f}%")
+    property_coverage_rate = properties_on_crime_streets / total_properties * 100
 
-    print("\n===== PROPERTY COVERAGE =====")
+    # ---------------------------------------------------------
+    # Official GIS validation results
+    # ---------------------------------------------------------
+
+    print("\n===== OFFICIAL GIS VALIDATION =====")
+    print(f"Official GIS streets: {len(official_streets)}")
+
+    print("\n===== REAL-ESTATE VALIDATION =====")
+    print(f"Real-estate streets: {len(real_estate_streets)}")
+    print(f"Valid: {len(valid_real_estate_streets)}")
+    print(f"Not found in GIS: {len(invalid_real_estate_streets)}")
+    print(f"Validity rate: {real_estate_validity_rate:.2f}%")
+
+    print("\n===== CRIME VALIDATION =====")
+    print(f"Crime streets: {len(crime_streets)}")
+    print(f"Valid: {len(valid_crime_streets)}")
+    print(f"Not found in GIS: {len(invalid_crime_streets)}")
+    print(f"Validity rate: {crime_validity_rate:.2f}%")
+
+    # ---------------------------------------------------------
+    # Existing dataset-overlap metrics
+    # ---------------------------------------------------------
+
+    print("\n===== REAL-ESTATE / CRIME OVERLAP =====")
+    print(f"Real-estate streets: {len(real_estate_streets)}")
+    print(f"Matched streets: {len(matched_streets)}")
+    print(f"Not found in crime data: " f"{len(unmatched_real_estate_streets)}")
+    print(f"Overlap rate: {street_match_rate:.2f}%")
+
+    print("\n===== PROPERTIES ON STREET CRIME  =====")
     print(f"Total properties: {total_properties}")
     print(f"Matched properties: {properties_on_crime_streets}")
-    print(f"Unmatched properties: {total_properties - properties_on_crime_streets}")
-    print(f"Property coverage: {properties_on_crime_streets_rate:.2f}%")
+    print(f"Unmatched properties: " f"{total_properties - properties_on_crime_streets}")
+    print(f"Property coverage: {property_coverage_rate:.2f}%")
 
-    print("\n===== UNMATCHED REAL-ESTATE STREETS =====")
-    print(f"Count: {len(unmatched_real_estate_streets)}")
-    for street in sorted(unmatched_real_estate_streets):
+    # ---------------------------------------------------------
+    # Streets requiring investigation
+    # ---------------------------------------------------------
+
+    print("\n===== REAL-ESTATE STREETS NOT FOUND IN GIS =====")
+    print(f"Count: {len(invalid_real_estate_streets)}")
+
+    for street in sorted(invalid_real_estate_streets):
         print(street)
 
-    print("\n===== UNMATCHED CRIME STREETS =====")
+    print("\n===== CRIME STREETS NOT FOUND IN GIS =====")
+    print(f"Count: {len(invalid_crime_streets)}")
+
+    # for street in sorted(invalid_crime_streets):
+    #     print(street)
+
+    print("\n===== CRIME STREETS NOT FOUND IN REAL ESTATE =====")
     print(f"Count: {len(unmatched_crime_streets)}")
-    for street in sorted(unmatched_crime_streets)[:200]:
-        print(street)
 
-    unmatched_property_counts = Counter()
-    for row in property_rows:
-        normalized_street = normalize_street_name(row[0])
-
-        if normalized_street not in crime_streets:
-            unmatched_property_counts[normalized_street] += 1
-
-    print("\n===== UNMATCHED PROPERTY DISTRIBUTION =====")
-    print(f"Count: {sum(unmatched_property_counts.values())}")
-
-    for street, count in unmatched_property_counts.most_common():
-        print(f"{street}: {count}")
+    # for street in sorted(unmatched_crime_streets):
+    #     print(street)
 
 
 if __name__ == "__main__":
