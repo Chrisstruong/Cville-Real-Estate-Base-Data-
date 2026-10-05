@@ -55,3 +55,23 @@ def test_extract_streets_edge_cases():
 
     for input_value, expected in cases.items():
         assert extract_streets(input_value) == expected
+
+
+def test_extract_streets_ignores_non_street_values():
+    cases = [
+        None,
+        "",
+        "UNKNOWN",
+        "<UNKNOWN>",
+        "UNKNOWN ST",
+        "UNKNWON",
+        "UKN ONLINE CRIME",
+        "DELETED ADDRESS -193206",
+        "DELETED ADDRESS -287301",
+        "DELETED ADDRESS -84750 /",
+        "-78.4659036420000000",
+        "38.057383549~-78.495331447",
+    ]
+
+    for value in cases:
+        assert extract_streets(value) == []

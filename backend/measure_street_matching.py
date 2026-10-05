@@ -6,7 +6,6 @@ from app.utils.street_normalizer import (
     normalize_street_name,
     extract_streets,
 )
-from collections import defaultdict
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -33,11 +32,10 @@ async def main():
         AND TRIM(streetname) <> ''
         """)
         official_rows = await result.fetchall()
-        # Temporary:
         """
-        ===== This is why 1 property is missing in the offical cville database  =====
-        Normalized: HILLSDALE DR
-        Raw: ['HILLSDALE DR', 'HILLSDALE DR ']
+        GIS contains both "HILLSDALE DR" and "HILLSDALE DR ".
+        Normalization strips the trailing whitespace, reducing
+        631 raw unique GIS street names to 630 normalized names.
         """
 
         # Get unique crime streets
@@ -45,7 +43,7 @@ async def main():
             
             SELECT DISTINCT street_name
             FROM crime
-            WHERE street_name IS NOT NULL
+            WHERE street_name IS NOT NULL AND TRIM(street_name) <> ''
             """)
         crime_rows = await result.fetchall()
 
@@ -81,9 +79,6 @@ async def main():
     # Real-estate validation against official GIS
     valid_real_estate_streets = real_estate_streets & official_streets
     invalid_real_estate_streets = real_estate_streets - official_streets
-
-    for street in sorted(invalid_real_estate_streets):
-        print(street)
 
     # Crime validation against official GIS
     valid_crime_streets = crime_streets & official_streets
@@ -165,8 +160,8 @@ async def main():
     print("\n===== CRIME STREETS NOT FOUND IN GIS =====")
     print(f"Count: {len(invalid_crime_streets)}")
 
-    # for street in sorted(invalid_crime_streets):
-    #     print(street)
+    for street in sorted(invalid_crime_streets):
+        print(street)
 
     print("\n===== CRIME STREETS NOT FOUND IN REAL ESTATE =====")
     print(f"Count: {len(unmatched_crime_streets)}")
