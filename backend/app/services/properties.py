@@ -3,6 +3,7 @@ from app.database.queries import (
     get_largest_properties,
     get_map_properties,
     get_all_map_properties,
+    get_property_by_parcel_number,
 )
 from app.services.crime_service import get_crime_streets
 from app.utils.street_normalizer import normalize_street_name
@@ -82,3 +83,7 @@ async def fetch_all_map_properties():
         "count": len(properties),
         "properties": properties,
     }
+
+
+async def fetch_property_by_parcel_number(parcel_number: str):
+    return await get_property_by_parcel_number(parcel_number)
