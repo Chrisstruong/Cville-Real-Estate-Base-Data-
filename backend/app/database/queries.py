@@ -98,3 +98,28 @@ async def get_all_map_properties():
                 """)
 
             return await cursor.fetchall()
+
+
+async def get_property_by_parcel_number(parcel_number: str):
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute(
+                """
+                SELECT
+                    parcel_number,
+                    current_assessed_value,
+                    object_id,
+                    st_number,
+                    st_name,
+                    st_unit,
+                    legal_description,
+                    lot_sqft,
+                    latitude,
+                    longitude
+                FROM real_estate_current_assessment
+                WHERE parcel_number = %s;
+                """,
+                (parcel_number,),
+            )
+
+            return await cursor.fetchone()

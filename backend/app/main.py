@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from psycopg.rows import dict_row  # Return query results as dictionary-like rows
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +24,7 @@ from app.services.properties import (
     fetch_properties,
     fetch_largest_properties,
     fetch_map_properties,
+    fetch_property_by_parcel_number,
 )
 
 
@@ -132,6 +133,16 @@ async def map_properties(
 @app.get("/api/properties/map/all")
 async def all_map_properties():
     return await fetch_all_map_properties()
+
+
+@app.get("/api/properties/{parcel_number}")
+async def property_by_parcel_number(parcel_number: str):
+    property_data = await fetch_property_by_parcel_number(parcel_number)
+
+    if property_data is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    return property_data
 
 
 @app.post("/api/chat")
