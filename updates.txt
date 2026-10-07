@@ -45,3 +45,191 @@ RequestContext
 RunContextWrapper
     ↓
 property tool
+
+10.x  Street normalization + GIS validation              ✅
+
+11.1  MapLibre + OpenStreetMap basemap                   ✅
+11.2  Geolocate real-estate properties                   ✅
+
+11.3  Property map
+  11.3.1  Map property API                               ✅
+  11.3.2  Test endpoint                                  ✅
+  11.3.3  React fetch                                    ✅
+  11.3.4  Initial property markers                       ✅
+  11.3.5  GeoJSON + 15,635 properties                    ✅
+  11.3.5E Property clustering                            ✅
+  11.3.6A Property click                                 ✅
+  11.3.6B Property detail API                            ✅
+  11.3.6C Fetch details on click                         ✅
+  11.3.6D Property popup                                 ✅
+  11.3.6E Cluster click → zoom                           ✅
+
+11.4  Crime geolocation                                  ← NEXT
+
+  11.4.1  Analyze crime location data
+          - Count total crime records
+          - Count records with block numbers
+          - Count street-only records
+          - Identify intersections / unusual addresses
+          - Measure how many use GIS-validated streets
+
+  11.4.2  Design crime location strategy
+          - Block number + street → approximate location
+          - Intersection → intersection location
+          - Street-only → avoid pretending we know exact location
+          - Unverified streets → preserve separately
+
+  11.4.3  Build crime geolocation baseline
+          - Intentionally simple baseline
+          - Measure how many incidents can be mapped
+
+  11.4.4  Improve crime geolocation
+          - Use official Charlottesville GIS data
+          - Improve block/street matching
+          - Handle intersections safely
+
+  11.4.5  Add latitude/longitude to crime records
+
+  11.4.6  Measure final crime mapping coverage
+          - Mapped
+          - Unmapped
+          - Mapping %
+          - Mapping method / confidence
+
+
+11.5  Crime API
+
+  11.5.1  Create lightweight map-crime query
+  11.5.2  Create FastAPI crime map endpoint
+  11.5.3  Test endpoint
+  11.5.4  Fetch crime GeoJSON from React
+
+
+11.6  Crime map visualization
+
+  11.6.1  Display crime locations on MapLibre
+  11.6.2  Add clustering / aggregation where appropriate
+  11.6.3  Click crime location
+  11.6.4  Fetch crime details
+  11.6.5  Display crime popup
+  11.6.6  Add filters
+          - Date
+          - Crime type/category
+
+
+11.7  Street-level crime analysis
+
+  11.7.1  Aggregate crimes by normalized street
+  11.7.2  Calculate crime counts
+  11.7.3  Add time-window calculations
+  11.7.4  Build crime statistics API
+  11.7.5  Connect statistics to property streets
+
+  IMPORTANT:
+  Crime count ≠ "safety score."
+  We should expose factual crime statistics first rather
+  than claiming a neighborhood is safe/unsafe.
+
+
+11.8  Combined property + crime experience
+
+  11.8.1  Click property → retrieve property details
+                                      ✅ foundation exists
+
+  11.8.2  Retrieve crime information for property street
+
+  11.8.3  Property panel
+          - Address
+          - Assessed value
+          - Lot size
+          - Parcel number
+          - Crime records/statistics
+
+  11.8.4  Highlight relevant crime locations on map
+
+  11.8.5  Add loading/error/empty states
+
+
+11.9  Backend tools for AI agent
+
+  11.9.1  Tool: find properties
+  11.9.2  Tool: get property by parcel
+  11.9.3  Tool: get crimes by street
+  11.9.4  Tool: get crime statistics
+  11.9.5  Tool: compare properties
+  11.9.6  Add strict result limits / guardrails
+  11.9.7  Test tool outputs independently
+
+
+11.10 AI + interactive map
+
+  11.10.1  Connect new property/crime tools to agent
+
+  11.10.2  Ask factual questions
+           "Show properties on EMMET ST"
+
+  11.10.3  Ask combined questions
+           "What crime records are associated with
+            the street for this property?"
+
+  11.10.4  Agent → map actions
+           - Zoom to property
+           - Highlight properties
+           - Highlight crime locations
+
+  11.10.5  Map selection → AI context
+           - Click property
+           - Ask AI about selected property
+
+  11.10.6  Add citations/data provenance
+           - Real-estate database
+           - Crime database
+           - Official GIS
+
+  11.10.7  Add hallucination protections
+           - Agent cannot invent crime records
+           - Agent cannot invent locations
+           - Clearly distinguish missing data
+
+
+11.11 Final UI / UX
+
+  11.11.1  Build final map + side-panel layout
+  11.11.2  Property detail card
+  11.11.3  Crime information panel
+  11.11.4  AI chat panel
+  11.11.5  Map legend
+  11.11.6  Filters
+  11.11.7  Responsive layout
+  11.11.8  Loading/error states
+
+
+11.12 Performance
+
+  11.12.1  Measure map load time
+  11.12.2  Measure API response time
+  11.12.3  Avoid sending unnecessary fields
+  11.12.4  Optimize GeoJSON / database queries
+  11.12.5  Add indexes where measurements justify them
+  11.12.6  Measure AI latency/token usage
+
+
+11.13 Final validation
+
+  11.13.1  Property-data correctness tests
+  11.13.2  Crime-data correctness tests
+  11.13.3  Map interaction tests
+  11.13.4  AI tool tests
+  11.13.5  Hallucination / missing-data tests
+  11.13.6  End-to-end user workflow test
+
+
+11.14 Documentation + deployment
+
+  11.14.1  Architecture diagram
+  11.14.2  Database/data-flow documentation
+  11.14.3  README setup instructions
+  11.14.4  Environment configuration
+  11.14.5  Production frontend/backend configuration
+  11.14.6  Deploy
+  11.14.7  Final demo
