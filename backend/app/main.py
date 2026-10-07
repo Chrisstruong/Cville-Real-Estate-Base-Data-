@@ -20,8 +20,10 @@ from pydantic import (
 
 from app.database.connection import pool
 from app.services.properties import (
+    fetch_all_map_properties,
     fetch_properties,
     fetch_largest_properties,
+    fetch_map_properties,
 )
 
 
@@ -118,6 +120,18 @@ class ChatRequest(BaseModel):
             raise ValueError("Message cannot be empty.")
 
         return value
+
+
+@app.get("/api/properties/map")
+async def map_properties(
+    limit: Annotated[int, Query(ge=1, le=20)] = 10,
+):
+    return await fetch_map_properties(limit)
+
+
+@app.get("/api/properties/map/all")
+async def all_map_properties():
+    return await fetch_all_map_properties()
 
 
 @app.post("/api/chat")

@@ -1,6 +1,8 @@
 from app.database.queries import (
     get_properties,
     get_largest_properties,
+    get_map_properties,
+    get_all_map_properties,
 )
 from app.services.crime_service import get_crime_streets
 from app.utils.street_normalizer import normalize_street_name
@@ -61,4 +63,22 @@ async def fetch_largest_properties(
     return {
         "count": len(cleaned_properties),
         "properties": cleaned_properties,
+    }
+
+
+async def fetch_map_properties(limit: int = 10):
+    properties = await get_all_map_properties()
+
+    return {
+        "count": len(properties),
+        "properties": properties,
+    }
+
+
+async def fetch_all_map_properties():
+    properties = await get_all_map_properties()
+
+    return {
+        "count": len(properties),
+        "properties": properties,
     }
