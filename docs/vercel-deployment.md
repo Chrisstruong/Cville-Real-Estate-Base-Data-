@@ -10,6 +10,15 @@ does not call another Vercel service. Bindings are runtime function variables;
 do not expose them through Vite build variables. PostgreSQL is external to these
 services and requires its own hosted database.
 
+If the frontend is hosted on Vercel and the API is hosted separately on Render,
+set `VITE_API_BASE_URL` in the Vercel frontend project's environment settings to
+the Render origin (for example,
+`https://cville-real-estate-base-data.onrender.com`, without `/api`). Then set
+`CORS_ORIGINS` on Render to the exact Vercel frontend origin and redeploy both.
+Vite embeds `VITE_API_BASE_URL` during the build. This is a public URL, not a
+secret. If Vercel also deploys the backend service from this file, the frontend
+will still use Render whenever `VITE_API_BASE_URL` is set.
+
 ## Environment
 
 Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and

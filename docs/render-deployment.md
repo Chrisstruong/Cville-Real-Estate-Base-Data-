@@ -26,10 +26,17 @@ Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and
 and untracked. PostgreSQL must be reachable from Render; a local database
 on your computer will not work. Apply the database provider's TLS requirements.
 
-This configuration deploys only the backend. The frontend currently uses
-same-origin `/api` URLs for Vercel Services. Hosting it separately requires
-an API reverse proxy or a configurable backend URL plus appropriate CORS;
-deploying this Render backend alone does not connect the frontend to it.
+If the frontend is hosted separately on Vercel, set `CORS_ORIGINS` in Render to
+the exact Vercel site origin (for example, `https://your-site.vercel.app`).
+For multiple allowed origins, separate them with commas. Set
+`VITE_API_BASE_URL` in the Vercel frontend project to the Render API origin
+(for example, `https://cville-real-estate-base-data.onrender.com`, without
+`/api`). Redeploy the frontend after changing it: Vite embeds this value at
+build time. Both values are public origins, not credentials.
+
+This configuration deploys only the backend. Without `VITE_API_BASE_URL`, the
+frontend continues to use same-origin `/api` URLs for local Vite development or
+the Vercel Services configuration in `vercel.json`.
 
 After deployment, verify `/health`, `/api/properties/map/all`, and
 `/api/crimes/map`, then test both detail endpoints. A successful configuration

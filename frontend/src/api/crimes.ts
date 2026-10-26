@@ -1,3 +1,5 @@
+import { apiUrl } from "./baseUrl";
+
 export type CrimeFeature = {
   type: "Feature";
   id: number;
@@ -20,7 +22,7 @@ export async function fetchMapCrimes(
   signal?: AbortSignal,
 ): Promise<CrimeFeatureCollection> {
   const response = await fetch(
-    "/api/crimes/map",
+    apiUrl("/api/crimes/map"),
     { signal },
   );
 
@@ -60,7 +62,7 @@ export async function fetchCrimeDetails(
   signal?: AbortSignal,
 ): Promise<CrimeDetails> {
   const response = await fetch(
-    `/api/crimes/${recordId}`,
+    apiUrl(`/api/crimes/${recordId}`),
     { signal },
   );
 
