@@ -64,7 +64,7 @@ property tool
   11.3.6D Property popup                                 ✅
   11.3.6E Cluster click → zoom                           ✅
 
-11.4  Crime geolocation                                  ← NEXT
+11.4  Crime geolocation                                  COMPLETE
 
   11.4.1  Analyze crime location data
           - Count total crime records
@@ -79,22 +79,34 @@ property tool
           - Street-only → avoid pretending we know exact location
           - Unverified streets → preserve separately
 
-  11.4.3  Build crime geolocation baseline
+  11.4.3  Build crime geolocation baseline                COMPLETE
           - Intentionally simple baseline
           - Measure how many incidents can be mapped
 
-  11.4.4  Improve crime geolocation
+  11.4.4  Improve crime geolocation                       COMPLETE
           - Use official Charlottesville GIS data
           - Improve block/street matching
           - Handle intersections safely
 
-  11.4.5  Add latitude/longitude to crime records
+          Intermediate: 19,189 -> 20,302 mapped (72.64% -> 76.85%).
+          Details: docs/crime_geolocation_metrics.md
 
-  11.4.6  Measure final crime mapping coverage
-          - Mapped
-          - Unmapped
-          - Mapping %
-          - Mapping method / confidence
+  11.4.5  Add latitude/longitude to crime records         COMPLETE
+          - Committed 26,418 incident updates (crime-geolocation-v1)
+          - Saved coordinates, mapping method, precision, and GIS sources
+          - Saved reasons for unmapped incidents
+          - Repeat dry run: 0 eligible incidents
+
+  11.4.6  Measure final crime mapping coverage            COMPLETE
+          - Total: 26,418 records
+          - Mapped: 20,270 (76.73%); unmapped: 6,148 (23.27%)
+          - Block midpoint: 19,157; merged block midpoint: 5
+          - Shared GIS endpoint: 1,108
+          - Precision: block_approximate / intersection_approximate
+          - All persisted data quality checks passed
+          - Final coverage excludes 32 closed single-segment block matches
+            included in the intermediate result above
+          - Verify: python -m scripts.profile_crime_mapping_coverage
 
 
 11.5  Crime API

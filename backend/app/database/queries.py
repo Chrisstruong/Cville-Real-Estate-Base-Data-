@@ -123,3 +123,45 @@ async def get_property_by_parcel_number(parcel_number: str):
             )
 
             return await cursor.fetchone()
+
+
+async def get_map_crimes():
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute("""
+                SELECT 
+                    record_id,
+                    latitude,
+                    longitude,
+                    location_precision
+                FROM crime
+                WHERE latitude IS NOT NULL
+                AND longitude IS NOT NULL
+                ORDER BY record_id
+                """)
+
+            return await cursor.fetchall()
+
+
+async def get_crime_by_record_id(record_id: int):
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute(
+                """
+                SELECT
+                    record_id,
+                    offense,
+                    date_reported,
+                    block_number,
+                    street_name,
+                    latitude,
+                    longitude,
+                    mapping_method,
+                    location_precision
+                FROM crime
+                WHERE record_id = %s
+                """,
+                (record_id,),
+            )
+
+            return await cursor.fetchone()

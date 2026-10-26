@@ -1,15 +1,12 @@
-\copy real_estate_current_assessment (
-    parcel_number,
-    current_assessed_value,
-    object_id,
-    st_number,
-    st_name,
-    st_unit,
-    legal_description,
-    lot_sqft
+REVOKE UPDATE (
+    latitude,
+    longitude,
+    mapping_method,
+    location_precision,
+    gis_source_ids,
+    unmapped_reason,
+    geolocation_version,
+    geolocation_checked_at
 )
-FROM 'C:\Users\truongm\MinhTrietTruong\projects\real-estate-ai\data\Real_Estate_(Current_Assessments).csv'
-WITH (
-    FORMAT csv,
-    HEADER true
-);
+ON TABLE public.crime
+FROM ai_reader;

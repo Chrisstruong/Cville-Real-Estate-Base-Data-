@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from agents import set_default_openai_key
 from app.config import settings
 from app.services.agent_service import run_real_estate_agent, stream_real_estate_agent
+from app.services.crime_service import fetch_map_crimes, fetch_crime_by_record_id
 
 import time
 
@@ -179,3 +180,21 @@ async def test_property_street(street_name: str):
         "normalized_street": normalize_street_name(street_name),
         "has_crime_records": await property_street_has_crime(street_name),
     }
+
+
+@app.get("/api/crimes/map")
+async def map_crimes():
+    return await fetch_map_crimes()
+
+
+@app.get("/api/crimes/{record_id}")
+async def crime_by_record_id(record_id: int):
+    crime = await fetch_crime_by_record_id(record_id)
+
+    if crime is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Crime record not found",
+        )
+
+    return crime

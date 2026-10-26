@@ -1,0 +1,144 @@
+11.4.3 — Crime geolocation baseline complete
+
+Method:
+Exact normalized street + block match against official GIS.
+Single valid road segment only.
+Coordinates calculated at the segment's length midpoint.
+Precision: block_approximate.
+
+Total records:
+Mapped:
+Unmapped:
+Mapping coverage:
+Eligible-record coverage:
+
+Unmapped reasons:
+[paste counts from report]
+
+Coordinates calculated in memory only.
+Sample locations manually checked.
+
+python -m scripts.profile_crime_block_matches
+
+Total crime records: 26,418
+Eligible for block matching: 23,969
+GIS features missing street/block: 0
+
+Outcomes - percentages of all crime records
+block_not_found: 799 (3.02%)
+intersection_pending: 1,528 (5.78%)
+mapped_block: 19,189 (72.64%)
+missing_block: 247 (0.93%)
+multiple_block_segments: 3,981 (15.07%)
+street_not_found: 576 (2.18%)
+unknown_location: 98 (0.37%)
+
+Baseline mapping coverage
+Mapped records: 19,189
+Unmapped records: 7,229
+Among all records: 72.64%
+Among eligible records: 80.06%
+
+Examples
+
+block_not_found
+ street='15TH ST NW, Apt 203', block=200, GIS IDs=()
+ street='JUNCTION LN', block=100, GIS IDs=()
+ street='RIO RD E', block=1000, GIS IDs=()
+ street='CARL SMITH ST', block=400, GIS IDs=()
+ street='4TH ST NW', block=400, GIS IDs=()
+
+Sample calculated coordinates
+1000 block of GROVE ST: latitude=38.029598, longitude=-78.498072, GIS ID=706
+1400 block of WESTWOOD RD: latitude=38.044217, longitude=-78.481519, GIS ID=1594
+1400 block of MELBOURNE RD, BLK: latitude=38.053463, longitude=-78.472980, GIS ID=1004
+100 block of ELLIEWOOD AVE: latitude=38.035587, longitude=-78.500730, GIS ID=544
+600 block of E MARKET ST: latitude=38.030263, longitude=-78.477039, GIS ID=1709
+
+intersection_pending
+ street='GARRETT ST / 1ST ST S', block=None, GIS IDs=()
+ street='GROVE ST / ROOSEVELT BROWN BLVD', block=None, GIS IDs=()
+ street='DUNOVA CT / STADIUM RD', block=None, GIS IDs=()
+ street='GARDEN DR @ CAMELLIA DR', block=None, GIS IDs=()
+ street='FRANKLIN ST / VINE ST', block=None, GIS IDs=()
+
+Sample calculated coordinates
+1000 block of GROVE ST: latitude=38.029598, longitude=-78.498072, GIS ID=706
+1400 block of WESTWOOD RD: latitude=38.044217, longitude=-78.481519, GIS ID=1594
+1400 block of MELBOURNE RD, BLK: latitude=38.053463, longitude=-78.472980, GIS ID=1004
+100 block of ELLIEWOOD AVE: latitude=38.035587, longitude=-78.500730, GIS ID=544
+600 block of E MARKET ST: latitude=38.030263, longitude=-78.477039, GIS ID=1709
+
+mapped_block
+ street='GROVE ST', block=1000, GIS IDs=(706,)
+ street='WESTWOOD RD', block=1400, GIS IDs=(1594,)
+ street='MELBOURNE RD, BLK', block=1400, GIS IDs=(1004,)
+ street='ELLIEWOOD AVE', block=100, GIS IDs=(544,)
+ street='E MARKET ST', block=600, GIS IDs=(1709,)
+
+Sample calculated coordinates
+1000 block of GROVE ST: latitude=38.029598, longitude=-78.498072, GIS ID=706
+1400 block of WESTWOOD RD: latitude=38.044217, longitude=-78.481519, GIS ID=1594
+1400 block of MELBOURNE RD, BLK: latitude=38.053463, longitude=-78.472980, GIS ID=1004
+100 block of ELLIEWOOD AVE: latitude=38.035587, longitude=-78.500730, GIS ID=544
+600 block of E MARKET ST: latitude=38.030263, longitude=-78.477039, GIS ID=1709
+
+missing_block
+ street='STEEPHILL ST', block=None, GIS IDs=()
+ street='ELLIEWOOD AVE', block=None, GIS IDs=()
+ street='6 1/2 ST SW', block=None, GIS IDs=()
+ street='LATROBE CT', block=None, GIS IDs=()
+ street='UNIVERSITY CIR, 2', block=None, GIS IDs=()
+
+Sample calculated coordinates
+1000 block of GROVE ST: latitude=38.029598, longitude=-78.498072, GIS ID=706
+1400 block of WESTWOOD RD: latitude=38.044217, longitude=-78.481519, GIS ID=1594
+1400 block of MELBOURNE RD, BLK: latitude=38.053463, longitude=-78.472980, GIS ID=1004
+100 block of ELLIEWOOD AVE: latitude=38.035587, longitude=-78.500730, GIS ID=544
+600 block of E MARKET ST: latitude=38.030263, longitude=-78.477039, GIS ID=1709
+
+multiple_block_segments
+ street='MEADE AVE', block=300, GIS IDs=(982, 983, 984)
+ street='5TH ST SW', block=1100, GIS IDs=(1733, 1734)
+ street='BARRACKS RD', block=2100, GIS IDs=(256, 257, 258)
+ street='EMMET ST N', block=900, GIS IDs=(577, 578)
+ street='CARLTON AVE, 205', block=1300, GIS IDs=(348, 349)
+
+Sample calculated coordinates
+1000 block of GROVE ST: latitude=38.029598, longitude=-78.498072, GIS ID=706
+1400 block of WESTWOOD RD: latitude=38.044217, longitude=-78.481519, GIS ID=1594
+1400 block of MELBOURNE RD, BLK: latitude=38.053463, longitude=-78.472980, GIS ID=1004
+100 block of ELLIEWOOD AVE: latitude=38.035587, longitude=-78.500730, GIS ID=544
+600 block of E MARKET ST: latitude=38.030263, longitude=-78.477039, GIS ID=1709
+
+street_not_found
+ street='PRESTON AVE, 2/B', block=1000, GIS IDs=()
+ street='MORSE-FRANK RD', block=3100, GIS IDs=()
+ street='BARRACKS RD @ EMMET ST', block=None, GIS IDs=()
+ street='KING ST @ 10TH ST', block=None, GIS IDs=()
+ street='5TH ST SW @ 5TH STREET STATION', block=None, GIS IDs=()
+
+Sample calculated coordinates
+1000 block of GROVE ST: latitude=38.029598, longitude=-78.498072, GIS ID=706
+1400 block of WESTWOOD RD: latitude=38.044217, longitude=-78.481519, GIS ID=1594
+1400 block of MELBOURNE RD, BLK: latitude=38.053463, longitude=-78.472980, GIS ID=1004
+100 block of ELLIEWOOD AVE: latitude=38.035587, longitude=-78.500730, GIS ID=544
+600 block of E MARKET ST: latitude=38.030263, longitude=-78.477039, GIS ID=1709
+
+unknown_location
+ street='UNKNWON', block=None, GIS IDs=()
+ street='-78.4953314470000000', block=3800, GIS IDs=()
+ street='<UNKNOWN>', block=None, GIS IDs=()
+ street='-78.4798086370000000', block=3800, GIS IDs=()
+ street='UNKNOWN ST', block=None, GIS IDs=()
+
+Sample calculated coordinates
+1000 block of GROVE ST: latitude=38.029598, longitude=-78.498072, GIS ID=706
+1400 block of WESTWOOD RD: latitude=38.044217, longitude=-78.481519, GIS ID=1594
+1400 block of MELBOURNE RD, BLK: latitude=38.053463, longitude=-78.472980, GIS ID=1004
+100 block of ELLIEWOOD AVE: latitude=38.035587, longitude=-78.500730, GIS ID=544
+600 block of E MARKET ST: latitude=38.030263, longitude=-78.477039, GIS ID=1709
+
+Coordinates calculated in memory only.
+Locations represent approximate road-block midpoints.
+No database records changed.
