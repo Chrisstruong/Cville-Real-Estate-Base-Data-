@@ -23,3 +23,4 @@ data/*.csv
 
 node_modules/
 dist/
+.vercel/

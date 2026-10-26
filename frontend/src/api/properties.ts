@@ -31,7 +31,7 @@ type MapPropertiesResponse = {
 export async function fetchMapProperties(
     limit = 10
 ): Promise<MapPropertiesResponse> {
-    const response = await fetch(`http://127.0.0.1:8000/api/properties/map?limit=${limit}`);
+    const response = await fetch(`/api/properties/map?limit=${limit}`);
     
     if (!response.ok) {
         throw new Error('Failed to fetch map properties: ${response.data}');
@@ -42,7 +42,7 @@ export async function fetchMapProperties(
 
 
 export async function fetchAllMapProperties(): Promise<MapPropertiesResponse> {
-    const response = await fetch ("http://127.0.0.1:8000/api/properties/map/all");
+    const response = await fetch ("/api/properties/map/all");
 
     if (!response.ok) {
         throw new Error(`Failed to fetch all map properties: ${response.status}`);
@@ -52,7 +52,7 @@ export async function fetchAllMapProperties(): Promise<MapPropertiesResponse> {
 }
 
 export async function fetchPropertyByParcelNumber(parcel_number: string): Promise<PropertyDetails> {
-    const response = await fetch(`http://127.0.0.1:8000/api/properties/${encodeURIComponent(parcel_number)}`);
+    const response = await fetch(`/api/properties/${encodeURIComponent(parcel_number)}`);
 
     if (!response.ok) {
         throw new Error(`Failed to fetch property: ${response.status}`)

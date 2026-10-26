@@ -20,7 +20,7 @@ export async function fetchMapCrimes(
   signal?: AbortSignal,
 ): Promise<CrimeFeatureCollection> {
   const response = await fetch(
-    "http://127.0.0.1:8000/api/crimes/map",
+    "/api/crimes/map",
     { signal },
   );
 
@@ -60,7 +60,7 @@ export async function fetchCrimeDetails(
   signal?: AbortSignal,
 ): Promise<CrimeDetails> {
   const response = await fetch(
-    `http://127.0.0.1:8000/api/crimes/${recordId}`,
+    `/api/crimes/${recordId}`,
     { signal },
   );
 
