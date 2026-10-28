@@ -1,10 +1,14 @@
 import { useEffect, useRef } from "react";
 import * as maplibregl from 'maplibre-gl';
 import "maplibre-gl/dist/maplibre-gl.css";
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import type { FeatureCollection, Point } from "geojson";
 
 import { fetchAllMapProperties, fetchPropertyByParcelNumber, } from "../api/properties";
 import { fetchMapCrimes, fetchCrimeDetails } from "../api/crimes";
+
+// MapLibre v6 needs an explicit worker URL when bundled by Vite.
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 function MapView() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
