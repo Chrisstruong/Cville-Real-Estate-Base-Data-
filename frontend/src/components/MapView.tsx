@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as maplibregl from 'maplibre-gl';
 import "maplibre-gl/dist/maplibre-gl.css";
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
@@ -6,12 +6,78 @@ import type { FeatureCollection, Point } from "geojson";
 
 import { fetchAllMapProperties, fetchPropertyByParcelNumber, } from "../api/properties";
 import { fetchMapCrimes, fetchCrimeDetails } from "../api/crimes";
+import { fetchNeighborhoods, neighborhoodBounds } from "../api/neighborhoods";
+import type { NeighborhoodFeature } from "../api/neighborhoods";
+
+const NEIGHBORHOOD_PALETTE = [
+  "#A8C9B0", // Sage Green
+  "#A9C8E8", // Soft Blue
+  "#F1D39B", // Warm Sand
+  "#C8B7DF", // Muted Lavender
+  "#9BD3D0", // Soft Teal
+  "#E8B7AE", // Dusty Rose
+];
 
 // MapLibre v6 needs an explicit worker URL when bundled by Vite.
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
-function MapView() {
+type Props = {
+  selectedNeighborhood: NeighborhoodFeature | null;
+  onSelectNeighborhood: (feature: NeighborhoodFeature) => void;
+};
+const DETAIL_LAYERS = [
+  "property-clusters",
+  "property-cluster-count",
+  "property-points",
+  "crime-clusters",
+  "crime-points",
+];
+
+function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [neighborhoodStatus, setNeighborhoodStatus] = useState("Loading neighborhoods…");
+  const [neighborhoodError, setNeighborhoodError] = useState(false);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return
+    function updateVisibility() {
+      if (!map) return;
+
+      const visibility = selectedNeighborhood ? "visible" : "none";
+
+      for (const id of DETAIL_LAYERS) {
+        if (
+          map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== visibility
+        ) {
+          map.setLayoutProperty(id, "visibility", visibility);
+        }
+      }
+    }
+
+    updateVisibility()
+
+    map.on("styledata", updateVisibility)
+
+    return () => {
+      map.off("styledata", updateVisibility)
+    }
+  }, [selectedNeighborhood])
+
+  // Synchronize React selection with the existing map, without rebuilding it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getSource("neighborhoods")) return;
+    if (!selectedNeighborhood) return;
+    map.setFeatureState({ source: "neighborhoods", id: selectedNeighborhood.id }, { selected: true });
+    map.fitBounds(neighborhoodBounds(selectedNeighborhood), { padding: 40, maxZoom: 16 });
+    return () => {
+      if (map.getSource("neighborhoods")) {
+        map.setFeatureState({ source: "neighborhoods", id: selectedNeighborhood.id }, { selected: false });
+      }
+    };
+  }, [selectedNeighborhood]);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -23,6 +89,7 @@ function MapView() {
       // Temporary OSM raster basemap 
       style: {
         version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: {
           osm: {
             type: "raster",
@@ -41,12 +108,147 @@ function MapView() {
             id: "osm",
             type: "raster",
             source: "osm",
+            paint: {
+              "raster-saturation": -0.65,
+              "raster-contrast": -0.15,
+              "raster-brightness-min": 0.15,
+            },
           },
         ],
       },
 
       center: [-78.4767, 38.0293],
       zoom: 12,
+    });
+    mapRef.current = map;
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(mapContainer.current);
+
+    map.on("load", async () => {
+      try {
+        const neighborhoods = await fetchNeighborhoods(crimeController.signal);
+        if (crimeController.signal.aborted) return;
+        const sortedIds = neighborhoods.features
+          .map(feature => feature.id)
+          .sort((a, b) => a - b);
+
+        for (const feature of neighborhoods.features) {
+          const colorIndex = sortedIds.indexOf(feature.id);
+
+          Object.assign(feature.properties, {
+            color: NEIGHBORHOOD_PALETTE[
+              colorIndex % NEIGHBORHOOD_PALETTE.length
+            ],
+          });
+        }
+        map.addSource("neighborhoods", { type: "geojson", data: neighborhoods });
+        // Insert before whichever marker layer arrived first.
+        const before = map.getStyle().layers.find(layer => layer.id !== "osm")?.id;
+        map.addLayer({
+          id: "neighborhood-fills", type: "fill", source: "neighborhoods",
+          paint: {
+            "fill-color": ["get", "color"],
+
+            "fill-opacity": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false], 0.23,
+              ["boolean", ["feature-state", "hover"], false], 0.4,
+              0.35,
+            ],
+          },
+        }, before);
+        map.addLayer({
+          id: "neighborhood-outlines", type: "line", source: "neighborhoods",
+          paint: {
+            "line-color": [
+              "case",
+
+              ["boolean", ["feature-state", "selected"], false],
+              "#2563EB",
+
+              ["boolean", ["feature-state", "hover"], false],
+              "#2563EB",
+
+              "#475569",
+            ],
+
+            "line-width": [
+              "case",
+
+              ["boolean", ["feature-state", "selected"], false],
+              3.5,
+
+              ["boolean", ["feature-state", "hover"], false],
+              2.5,
+
+              1.75,
+            ],
+          },
+        }, before);
+        map.addLayer({
+          id: "neighborhood-labels", type: "symbol", source: "neighborhoods",
+          layout: {
+            "text-field": ["get", "NAME"],
+            "text-font": ["Open Sans Regular"],
+
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              11, 13,
+              14, 16,
+            ],
+
+            "text-max-width": 12,
+            "text-padding": 4,
+          },
+
+          paint: {
+            "text-color": "#172B4D",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 2,
+            "text-halo-blur": 0.5,
+          },
+
+        }, before);
+
+        const markerLayers = ["property-points", "property-clusters", "crime-points", "crime-clusters"];
+        function markerAt(point: maplibregl.Point) {
+          const layers = markerLayers.filter(id => map.getLayer(id));
+          return layers.length > 0 && map.queryRenderedFeatures(point, { layers }).length > 0;
+        }
+        let hovered: number | null = null;
+        function clearHover() {
+          if (hovered !== null) map.setFeatureState({ source: "neighborhoods", id: hovered }, { hover: false });
+          hovered = null;
+        }
+        map.on("mousemove", "neighborhood-fills", event => {
+          clearHover();
+          if (!markerAt(event.point)) {
+            hovered = Number(event.features?.[0]?.id);
+            if (Number.isInteger(hovered)) map.setFeatureState({ source: "neighborhoods", id: hovered }, { hover: true });
+          }
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", "neighborhood-fills", () => {
+          clearHover();
+          map.getCanvas().style.cursor = "";
+        });
+        map.on("click", "neighborhood-fills", event => {
+          if (markerAt(event.point)) return;
+          const feature = neighborhoods.features.find(item => item.id === event.features?.[0]?.id);
+          if (feature) {
+            onSelectNeighborhood(feature);
+            // Also zoom when clicking the already-selected feature.
+            map.fitBounds(neighborhoodBounds(feature), { padding: 40, maxZoom: 16 });
+          }
+        });
+        setNeighborhoodStatus(`${neighborhoods.features.length} planning neighborhoods loaded.`);
+      } catch (error) {
+        if (crimeController.signal.aborted) return;
+        setNeighborhoodError(true);
+        setNeighborhoodStatus(error instanceof Error ? error.message : "Could not load neighborhoods.");
+      }
     });
 
     map.on("load", async () => {
@@ -91,6 +293,9 @@ function MapView() {
           id: "property-clusters",
           type: "circle",
           source: "properties",
+          layout: {
+            visibility: "none",
+          },
 
           filter: ["has", "point_count"],
 
@@ -119,6 +324,7 @@ function MapView() {
           filter: ["has", "point_count"],
 
           layout: {
+            visibility: "none", // Add this line.
             "text-field": "{point_count_abbreviated}",
             "text-size": 12,
           },
@@ -133,6 +339,9 @@ function MapView() {
           id: "property-points",
           type: "circle",
           source: "properties",
+          layout: {
+            visibility: "none",
+          },
 
           filter: ["!", ["has", "point_count"]],
 
@@ -323,6 +532,9 @@ function MapView() {
           id: "crime-clusters",
           type: "circle",
           source: "crimes",
+          layout: {
+            visibility: "none",
+          },
           filter: ["has", "point_count"],
           paint: {
             "circle-color": "#c2410c",
@@ -346,6 +558,9 @@ function MapView() {
           id: "crime-points",
           type: "circle",
           source: "crimes",
+          layout: {
+            visibility: "none",
+          },
           filter: ["!", ["has", "point_count"]],
           paint: {
             "circle-color": "#ea580c",
@@ -649,18 +864,27 @@ function MapView() {
 
     return () => {
       crimeController.abort();
+      resizeObserver.disconnect();
+      mapRef.current = null;
       map.remove();
     };
-  }, []);
+  }, [onSelectNeighborhood]);
+
+  
+  
+  
 
   return (
-    <div
-      ref={mapContainer}
-      style={{
-        width: "100%",
-        height: "100vh",
-      }}
-    />
+    <section className="neighborhood-map" aria-label="Property, crime, and neighborhood map">
+      <p className="neighborhood-load-status" role={neighborhoodError ? "alert" : "status"}>{neighborhoodStatus}</p>
+      <div
+        ref={mapContainer}
+        style={{
+          width: "80%",
+          height: "80%",
+        }}
+      />
+    </section>
   );
 }
 
