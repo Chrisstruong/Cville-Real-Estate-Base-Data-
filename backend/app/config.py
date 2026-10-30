@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     
     openai_api_key: str
     cors_origins: str = ""
+    frontend_url: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

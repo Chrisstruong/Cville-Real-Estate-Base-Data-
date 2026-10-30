@@ -75,3 +75,4 @@ uvicorn==0.52.4
 watchfiles==1.2.0
 websockets==16.1.1
 wheel==0.48.0
+shapely==2.2.0

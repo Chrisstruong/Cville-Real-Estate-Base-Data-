@@ -129,119 +129,59 @@ property tool
           - Crime type/category
 
 
-11.7  Street-level crime analysis
-
-  11.7.1  Aggregate crimes by normalized street
-  11.7.2  Calculate crime counts
-  11.7.3  Add time-window calculations
-  11.7.4  Build crime statistics API
-  11.7.5  Connect statistics to property streets
-
-  IMPORTANT:
-  Crime count ≠ "safety score."
-  We should expose factual crime statistics first rather
-  than claiming a neighborhood is safe/unsafe.
+11.7.1 — Inspect official GIS data
+[ ] Locate the Planning Neighborhoods feature layer.
+[ ] Verify the NAME field, feature IDs and geometry type.
+[ ] Confirm GeoJSON export works and determine the actual neighborhood count.
+[ ] Check for missing names, invalid geometry or unexpected duplicate features.
 
 
-11.8  Combined property + crime experience
-
-  11.8.1  Click property → retrieve property details
-                                      ✅ foundation exists
-
-  11.8.2  Retrieve crime information for property street
-
-  11.8.3  Property panel
-          - Address
-          - Assessed value
-          - Lot size
-          - Parcel number
-          - Crime records/statistics
-
-  11.8.4  Highlight relevant crime locations on map
-
-  11.8.5  Add loading/error/empty states
+11.7.2 — Retrieve neighborhood boundaries
+[ ] Download all official neighborhood polygons as GeoJSON.
+[ ] Use outSR=4326 so coordinates work with MapLibre.
+[ ] Handle ArcGIS pagination or transfer limits if needed.
+[ ] Save a versioned GeoJSON snapshot and source metadata.
 
 
-11.9  Backend tools for AI agent
-
-  11.9.1  Tool: find properties
-  11.9.2  Tool: get property by parcel
-  11.9.3  Tool: get crimes by street
-  11.9.4  Tool: get crime statistics
-  11.9.5  Tool: compare properties
-  11.9.6  Add strict result limits / guardrails
-  11.9.7  Test tool outputs independently
+11.7.3 — Validate GeoJSON
+[ ] Check FeatureCollection structure, Polygon/MultiPolygon geometry and coordinate order.
+[ ] Verify every feature has a valid name and stable identifier.
+[ ] Check coverage against Charlottesville city limits.
+[ ] Avoid hardcoding an assumed neighborhood count.
 
 
-11.10 AI + interactive map
-
-  11.10.1  Connect new property/crime tools to agent
-
-  11.10.2  Ask factual questions
-           "Show properties on EMMET ST"
-
-  11.10.3  Ask combined questions
-           "What crime records are associated with
-            the street for this property?"
-
-  11.10.4  Agent → map actions
-           - Zoom to property
-           - Highlight properties
-           - Highlight crime locations
-
-  11.10.5  Map selection → AI context
-           - Click property
-           - Ask AI about selected property
-
-  11.10.6  Add citations/data provenance
-           - Real-estate database
-           - Crime database
-           - Official GIS
-
-  11.10.7  Add hallucination protections
-           - Agent cannot invent crime records
-           - Agent cannot invent locations
-           - Clearly distinguish missing data
+11.7.4 — Add neighborhood layers to MapLibre
+[ ] Add GeoJSON source to the existing map after style load.
+[ ] Add semi-transparent polygon fill layer.
+[ ] Add visible boundary outline layer.
+[ ] Add neighborhood name labels.
+[ ] Ensure existing crime/property layers remain functional.
 
 
-11.11 Final UI / UX
-
-  11.11.1  Build final map + side-panel layout
-  11.11.2  Property detail card
-  11.11.3  Crime information panel
-  11.11.4  AI chat panel
-  11.11.5  Map legend
-  11.11.6  Filters
-  11.11.7  Responsive layout
-  11.11.8  Loading/error states
+11.7.5 — Implement hover interaction
+[ ] Highlight polygon on mouse hover.
+[ ] Show neighborhood name as a tooltip or cursor hint.
+[ ] Reset hover state on mouse leave.
+[ ] Ensure highlighting does not require reloading GeoJSON.
 
 
-11.12 Performance
-
-  11.12.1  Measure map load time
-  11.12.2  Measure API response time
-  11.12.3  Avoid sending unnecessary fields
-  11.12.4  Optimize GeoJSON / database queries
-  11.12.5  Add indexes where measurements justify them
-  11.12.6  Measure AI latency/token usage
+11.7.6 — Implement click-to-select
+[ ] Click polygon to identify the neighborhood.
+[ ] Store selected neighborhood ID and name in React state.
+[ ] Highlight selected boundary distinctly.
+[ ] Fit map to selected neighborhood's geographic extent.
+[ ] Show neighborhood name in a side panel.
 
 
-11.13 Final validation
-
-  11.13.1  Property-data correctness tests
-  11.13.2  Crime-data correctness tests
-  11.13.3  Map interaction tests
-  11.13.4  AI tool tests
-  11.13.5  Hallucination / missing-data tests
-  11.13.6  End-to-end user workflow test
+11.7.7 — Add map controls
+[ ] Add a Show Neighborhood Boundaries toggle.
+[ ] Add a neighborhood dropdown or search.
+[ ] Add Clear Selection / Back to Charlottesville control.
+[ ] Ensure selection works after zooming and switching layers.
 
 
-11.14 Documentation + deployment
-
-  11.14.1  Architecture diagram
-  11.14.2  Database/data-flow documentation
-  11.14.3  README setup instructions
-  11.14.4  Environment configuration
-  11.14.5  Production frontend/backend configuration
-  11.14.6  Deploy
-  11.14.7  Final demo
+11.7.8 — Test and document
+[ ] Verify boundaries and labels across the city.
+[ ] Test clicks, hover, deselection and map reloads.
+[ ] Check performance and mobile behavior.
+[ ] Document GIS data source, projection and update workflow.

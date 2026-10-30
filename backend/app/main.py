@@ -10,6 +10,7 @@ from agents import set_default_openai_key
 from app.config import settings
 from app.services.agent_service import run_real_estate_agent, stream_real_estate_agent
 from app.services.crime_service import fetch_map_crimes, fetch_crime_by_record_id
+from app.services.neighborhoods import fetch_neighborhood_records
 
 import time
 
@@ -53,7 +54,12 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-    ] + [origin.strip().rstrip("/") for origin in settings.cors_origins.split(",") if origin.strip()],
+    ]
+    + [
+        origin.strip().rstrip("/")
+        for origin in [settings.frontend_url, *settings.cors_origins.split(",")]
+        if origin.strip()
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -176,7 +182,7 @@ async def test_property_street(street_name: str):
     from app.utils.street_normalizer import normalize_street_name
 
     return {
-        "st_name": street_name,
+        "st_name": Wstreet_name,
         "normalized_street": normalize_street_name(street_name),
         "has_crime_records": await property_street_has_crime(street_name),
     }
@@ -198,3 +204,16 @@ async def crime_by_record_id(record_id: int):
         )
 
     return crime
+
+
+@app.get("/api/neighborhoods/{neighborhood_id}/properties")
+async def neighborhood_properties(neighborhood_id: int):
+    return await fetch_neighborhood_records(
+        neighborhood_id,
+        "properties",
+    )
+
+
+@app.get("/api/neighborhoods/{neighborhood_id}/crimes")
+async def neighborhood_crimes(neighborhood_id: int):
+    return await fetch_neighborhood_records(neighborhood_id, "crimes")

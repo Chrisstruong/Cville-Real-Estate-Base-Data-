@@ -4,8 +4,13 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import type { FeatureCollection, Point } from "geojson";
 
-import { fetchAllMapProperties, fetchPropertyByParcelNumber, } from "../api/properties";
-import { fetchMapCrimes, fetchCrimeDetails } from "../api/crimes";
+import { fetchPropertyByParcelNumber } from "../api/properties";
+import { fetchCrimeDetails } from "../api/crimes";
+import type { CrimeFeature } from "../api/crimes";
+import {
+  fetchNeighborhoodProperties,
+  fetchNeighborhoodCrimes,
+} from "../api/neighborhoodRecords"
 import { fetchNeighborhoods, neighborhoodBounds } from "../api/neighborhoods";
 import type { NeighborhoodFeature } from "../api/neighborhoods";
 
@@ -32,48 +37,64 @@ const DETAIL_LAYERS = [
   "crime-clusters",
   "crime-points",
 ];
+const EMPTY_POINTS: FeatureCollection<Point> = {
+  type: "FeatureCollection",
+  features: [],
+}
+function locationKey(longitude: number, latitude: number) {
+  return `${longitude},${latitude}`
+}
+function setDetailVisibility(
+  map: maplibregl.Map,
+  visible: boolean,
+) {
+  for (const id of DETAIL_LAYERS) {
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(
+        id,
+        "visibility",
+        visible ? "visible" : "none",
+      )
+    }
+  }
+}
 
 function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [neighborhoodStatus, setNeighborhoodStatus] = useState("Loading neighborhoods…");
   const [neighborhoodError, setNeighborhoodError] = useState(false);
+  const [recordsStatus, setRecordsStatus] = useState("");
+  const [recordsError, setRecordsError] = useState(false);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return
-    function updateVisibility() {
-      if (!map) return;
+  //Incremented whenever selection changes
+  const recordsVersion = useRef(0)
 
-      const visibility = selectedNeighborhood ? "visible" : "none";
+  //Click handlers read the latest records from these refs
+  const crimesById = useRef(new Map<number, CrimeFeature>());
+  const crimesByLocation = useRef(new Map<string, CrimeFeature[]>());
 
-      for (const id of DETAIL_LAYERS) {
-        if (
-          map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== visibility
-        ) {
-          map.setLayoutProperty(id, "visibility", visibility);
-        }
-      }
-    }
+  //Track open marker popups so switching closes them
+  const recordPopups = useRef(new Set<maplibregl.Popup>());
 
-    updateVisibility()
+  //Serialize source updates so older write cannot finish last
+  const sourceWrites = useRef<Promise<void>>(Promise.resolve());
 
-    map.on("styledata", updateVisibility)
 
-    return () => {
-      map.off("styledata", updateVisibility)
-    }
-  }, [selectedNeighborhood])
+
 
   // Synchronize React selection with the existing map, without rebuilding it.
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.getSource("neighborhoods")) return;
-    if (!selectedNeighborhood) return;
+    if (!selectedNeighborhood) {
+      map.easeTo({ center: [-78.4767, 38.0293], zoom: 12 });
+      return;
+    }
     map.setFeatureState({ source: "neighborhoods", id: selectedNeighborhood.id }, { selected: true });
     map.fitBounds(neighborhoodBounds(selectedNeighborhood), { padding: 40, maxZoom: 16 });
     return () => {
-      if (map.getSource("neighborhoods")) {
+      if (mapRef.current === map && map.getSource("neighborhoods")) {
         map.setFeatureState({ source: "neighborhoods", id: selectedNeighborhood.id }, { selected: false });
       }
     };
@@ -253,32 +274,10 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
     map.on("load", async () => {
       try {
-        const data = await fetchAllMapProperties();
-        if (crimeController.signal.aborted) return
-
-        console.log("PROPERTY COUNT:", data.count);
         const geojson: FeatureCollection<Point> = {
           type: "FeatureCollection",
-
-          features: data.properties.map((property) => ({
-            type: "Feature",
-
-            geometry: {
-              type: "Point",
-              coordinates: [
-                property.longitude,
-                property.latitude,
-              ],
-            },
-
-            properties: {
-              parcel_number: property.parcel_number,
-            },
-          })),
-        };
-
-        console.log("PROPERTY COUNT:", data.count);
-        console.log("GEOJSON FEATURES:", geojson.features.length);
+          features: [],
+        }
 
         map.addSource("properties", {
           type: "geojson",
@@ -389,9 +388,15 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
           const parcelNumber = feature.properties?.parcel_number;
 
           if (!parcelNumber) return
+          const requestVersion = recordsVersion.current;
 
           try {
             const property = await fetchPropertyByParcelNumber(parcelNumber);
+            if (crimeController.signal.aborted ||
+              requestVersion !== recordsVersion.current
+            ) {
+              return
+            }
 
             if (
               property.longitude === null ||
@@ -409,7 +414,7 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
             const lotSize = property.lot_sqft.toLocaleString();
 
-            new maplibregl.Popup({
+            const popup = new maplibregl.Popup({
               offset: 12,
             }).setLngLat([
               property.longitude!,
@@ -428,6 +433,10 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
             </div>
             `).addTo(map);
+            recordPopups.current.add(popup);
+            popup.on("close", () => {
+              recordPopups.current.delete(popup);
+            });
 
             console.log("Fetched property:", property);
           } catch (error) {
@@ -460,16 +469,18 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
             "properties"
           ) as maplibregl.GeoJSONSource;
 
-          const zoom = await source.getClusterExpansionZoom(clusterId);
+          const requestVersion = recordsVersion.current;
+          try {
+            const zoom = await source.getClusterExpansionZoom(clusterId);
+            if (crimeController.signal.aborted || requestVersion !== recordsVersion.current) return;
 
-          const coordinates = (
-            feature.geometry as Point
-          ).coordinates as [number, number];
-
-          map.easeTo({
-            center: coordinates,
-            zoom: zoom,
-          })
+            const coordinates = (feature.geometry as Point).coordinates as [number, number];
+            map.easeTo({ center: coordinates, zoom });
+          } catch (error) {
+            if (!crimeController.signal.aborted && requestVersion === recordsVersion.current) {
+              console.error("Could not expand property cluster:", error);
+            }
+          }
         })
 
         map.on("mouseenter", "property-points", () => {
@@ -497,31 +508,11 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
     map.on("load", async () => {
       try {
-        const crimes = await fetchMapCrimes(crimeController.signal);
 
-        if (crimeController.signal.aborted) return;
-        // Several records can share the same approximate location.
-        const crimesByLocation = new Map<
-          string,
-          (typeof crimes.features)[number][]
-        >();
-
-        function locationKey(longitude: number, latitude: number) {
-          return `${longitude},${latitude}`;
-        }
-
-        for (const feature of crimes.features) {
-          const [longitude, latitude] = feature.geometry.coordinates;
-          const key = locationKey(longitude, latitude);
-          const records = crimesByLocation.get(key) ?? [];
-
-          records.push(feature);
-          crimesByLocation.set(key, records);
-        }
 
         map.addSource("crimes", {
           type: "geojson",
-          data: crimes,
+          data: EMPTY_POINTS,
           cluster: true,
           clusterMaxZoom: 16,
           clusterRadius: 45,
@@ -586,15 +577,13 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
           const recordId = Number(clickedFeature.properties.record_id);
 
           // Use original GeoJSON coordinates, avoiding rendered-coordinate rounding.
-          const originalFeature = crimes.features.find(
-            (feature) => feature.properties.record_id === recordId,
-          );
+          const originalFeature = crimesById.current.get(recordId);
 
           if (!originalFeature) return;
 
           const [longitude, latitude] = originalFeature.geometry.coordinates;
           const key = locationKey(longitude, latitude);
-          const records = crimesByLocation.get(key) ?? [];
+          const records = crimesByLocation.current.get(key) ?? [];
 
           if (records.length === 0) return;
 
@@ -780,6 +769,8 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
             .setDOMContent(container)
             .addTo(map);
 
+          recordPopups.current.add(popup);
+
           function cancelDetails() {
             detailController?.abort();
           }
@@ -793,6 +784,7 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
           // Also cancel when this popup closes.
           popup.on("close", () => {
+            recordPopups.current.delete(popup);
             cancelDetails();
             crimeController.signal.removeEventListener(
               "abort",
@@ -818,27 +810,30 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
             feature.geometry.coordinates[1],
           ];
 
+          const requestVersion = recordsVersion.current;
           try {
             const source = map.getSource("crimes") as maplibregl.GeoJSONSource;
 
             const zoom = await source.getClusterExpansionZoom(clusterId);
 
-            if (crimeController.signal.aborted) return;
+            if (crimeController.signal.aborted || requestVersion !== recordsVersion.current) return;
 
             map.easeTo({
               center: coordinates,
               zoom,
             });
 
-            new maplibregl.Popup({ offset: 12 })
+            const popup = new maplibregl.Popup({ offset: 12 })
               .setLngLat(coordinates)
               .setText(
                 `${count.toLocaleString()} crime records in this cluster. ` +
                 "Locations are approximate.",
               )
               .addTo(map);
+            recordPopups.current.add(popup);
+            popup.on("close", () => recordPopups.current.delete(popup));
           } catch (error) {
-            if (!crimeController.signal.aborted) {
+            if (!crimeController.signal.aborted && requestVersion === recordsVersion.current) {
               console.error("Could not expand crime cluster:", error);
             }
           }
@@ -854,7 +849,6 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
           });
         }
 
-        console.log("Crime map records loaded:", crimes.features.length);
       } catch (error) {
         if (!crimeController.signal.aborted) {
           console.error("Failed to load crime locations:", error);
@@ -869,14 +863,185 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
       map.remove();
     };
   }, [onSelectNeighborhood]);
+  useEffect(() => {
+    const currentMap = mapRef.current;
+    if (!currentMap) return;
+    const map: maplibregl.Map = currentMap;
 
-  
-  
-  
+    const controller = new AbortController();
+    const version = ++recordsVersion.current;
+    let started = false;
+
+    function isCurrent() {
+      return (
+        !controller.signal.aborted &&
+        recordsVersion.current === version &&
+        mapRef.current === map
+      );
+    }
+
+    function clearLookupsAndPopups() {
+      crimesById.current.clear();
+      crimesByLocation.current.clear();
+
+      for (const popup of recordPopups.current) {
+        popup.remove();
+      }
+
+      recordPopups.current.clear();
+    }
+
+    // Hide immediately; setData is asynchronous.
+    setDetailVisibility(map, false);
+    clearLookupsAndPopups();
+
+    async function startLoading() {
+      if (started || !isCurrent()) return;
+
+      const propertiesSource = map.getSource(
+        "properties",
+      ) as maplibregl.GeoJSONSource | undefined;
+
+      const crimesSource = map.getSource(
+        "crimes",
+      ) as maplibregl.GeoJSONSource | undefined;
+
+      if (!propertiesSource || !crimesSource) return;
+
+      started = true;
+      setRecordsError(false);
+
+      function writeSources(
+        properties: FeatureCollection<Point>,
+        crimes: FeatureCollection<Point>,
+      ) {
+        const operation = sourceWrites.current.then(async () => {
+          if (!isCurrent()) return;
+
+          const results = await Promise.allSettled([
+            propertiesSource!.setData(properties),
+            crimesSource!.setData(crimes),
+          ]);
+
+          for (const result of results) {
+            if (result.status === "rejected") {
+              throw result.reason;
+            }
+          }
+        });
+
+        // Keep the queue usable after a failed update.
+        sourceWrites.current = operation.catch(() => { });
+        return operation;
+      }
+
+      try {
+        await writeSources(EMPTY_POINTS, EMPTY_POINTS);
+        if (!isCurrent()) return;
+
+        if (!selectedNeighborhood) {
+          setRecordsStatus("");
+          return;
+        }
+
+        const id = selectedNeighborhood.id;
+        const name = selectedNeighborhood.properties.NAME;
+
+        setRecordsStatus(`Loading properties and crime records for ${name}…`);
+
+        // Both must succeed before either dataset becomes visible.
+        const [properties, crimes] = await Promise.all([
+          fetchNeighborhoodProperties(id, controller.signal),
+          fetchNeighborhoodCrimes(id, controller.signal),
+        ]);
+
+        if (!isCurrent()) return;
+
+        await writeSources(properties, crimes);
+        if (!isCurrent()) return;
+
+        for (const feature of crimes.features) {
+          crimesById.current.set(
+            feature.properties.record_id,
+            feature,
+          );
+
+          const [longitude, latitude] = feature.geometry.coordinates;
+          const key = locationKey(longitude, latitude);
+          const records = crimesByLocation.current.get(key) ?? [];
+
+          records.push(feature);
+          crimesByLocation.current.set(key, records);
+        }
+
+        const propertyCount = properties.features.length;
+        const crimeCount = crimes.features.length;
+
+        setDetailVisibility(map, true);
+
+        setRecordsStatus(
+          `${name}: ` +
+          `${propertyCount === 0 ? "No properties" : `${propertyCount.toLocaleString()} properties`}; ` +
+          `${crimeCount === 0 ? "no mapped crime records" : `${crimeCount.toLocaleString()} mapped crime records`}.`,
+        );
+      } catch (error) {
+        if (!isCurrent()) return;
+
+        setDetailVisibility(map, false);
+        clearLookupsAndPopups();
+
+        // Clear any partially updated source before reporting failure.
+        try {
+          await writeSources(EMPTY_POINTS, EMPTY_POINTS);
+        } catch {
+          // Layers remain hidden even if clearing fails.
+        }
+
+        if (!isCurrent()) return;
+
+        setRecordsError(true);
+        setRecordsStatus(
+          error instanceof Error
+            ? error.message
+            : "Could not load neighborhood records.",
+        );
+
+        // Cancel the other fetch if one request failed.
+        controller.abort();
+      }
+    }
+
+    // Handles both an already-loaded map and sources added later.
+    const onStyleData = () => {
+      void startLoading();
+    };
+
+    map.on("styledata", onStyleData);
+    void startLoading();
+
+    return () => {
+      controller.abort();
+      recordsVersion.current = version + 1;
+      map.off("styledata", onStyleData);
+
+      if (mapRef.current === map) {
+        setDetailVisibility(map, false);
+      }
+
+      clearLookupsAndPopups();
+    };
+  }, [selectedNeighborhood]);
+
+
+
+
 
   return (
     <section className="neighborhood-map" aria-label="Property, crime, and neighborhood map">
-      <p className="neighborhood-load-status" role={neighborhoodError ? "alert" : "status"}>{neighborhoodStatus}</p>
+      <p className="neighborhood-load-status" role={neighborhoodError || recordsError ? "alert" : "status"}>
+        {neighborhoodStatus}
+        {recordsStatus && <><br />{recordsStatus}</>}
+      </p>
       <div
         ref={mapContainer}
         style={{
