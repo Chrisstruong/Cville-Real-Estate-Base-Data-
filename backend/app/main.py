@@ -11,6 +11,7 @@ from app.config import settings
 from app.services.agent_service import run_real_estate_agent, stream_real_estate_agent
 from app.services.crime_service import fetch_map_crimes, fetch_crime_by_record_id
 from app.services.neighborhoods import fetch_neighborhood_records
+from app.neighborhood_overview import router as neighborhood_overview_router
 
 import time
 
@@ -48,7 +49,7 @@ app = FastAPI(
     title="Charlottesville Real Estate AI API",
     lifespan=lifespan,
 )
-
+app.include_router(neighborhood_overview_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
