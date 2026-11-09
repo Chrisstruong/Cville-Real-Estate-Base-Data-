@@ -11,6 +11,7 @@ from psycopg.rows import dict_row
 from shapely.geometry import shape
 
 from app.database.connection import pool
+from app.services.crime_categories import category_for_offense
 
 DATA_PATH = (
     Path(__file__).resolve().parents[1] / "data" / "planning-neighborhoods.geojson"
@@ -33,6 +34,7 @@ DATASETS = {
             "longitude",
             "latitude",
             "location_precision",
+            "offense",
         ),
     ),
 }
@@ -175,6 +177,10 @@ async def fetch_neighborhood_records(
             for column in columns
             if column not in ("longitude", "latitude")
         }
+        if dataset == "crimes":
+            properties["category"] = category_for_offense(
+                properties.pop("offense", None)
+            )
 
         properties["neighborhood_id"] = neighborhood_id
         properties["membership_basis"] = "mapped_point"

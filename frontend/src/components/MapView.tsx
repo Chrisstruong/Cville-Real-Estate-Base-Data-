@@ -5,7 +5,6 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import type { FeatureCollection, Point } from "geojson";
 
 import { fetchPropertyByParcelNumber } from "../api/properties";
-import { fetchCrimeDetails } from "../api/crimes";
 import type { CrimeFeature } from "../api/crimes";
 import {
   fetchNeighborhoodProperties,
@@ -13,6 +12,8 @@ import {
 } from "../api/neighborhoodRecords"
 import { fetchNeighborhoods, neighborhoodBounds } from "../api/neighborhoods";
 import type { NeighborhoodFeature } from "../api/neighborhoods";
+import { prepareCrimeMarkers } from "../map/crimeMarkers";
+import "./MapView.css";
 
 const NEIGHBORHOOD_PALETTE = [
   "#A8C9B0", // Sage Green
@@ -27,8 +28,11 @@ const NEIGHBORHOOD_PALETTE = [
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 type Props = {
+  selectedCrimeIds: number[] | null;
   selectedNeighborhood: NeighborhoodFeature | null;
   onSelectNeighborhood: (feature: NeighborhoodFeature) => void;
+  onSelectCrimeLocation: (recordIds: number[], categories: Record<number, string>) => void;
+  onClearCrimeSelection: () => void;
 };
 const DETAIL_LAYERS = [
   "property-clusters",
@@ -59,7 +63,7 @@ function setDetailVisibility(
   }
 }
 
-function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
+function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood, onSelectCrimeLocation, onClearCrimeSelection, }: Props) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [neighborhoodStatus, setNeighborhoodStatus] = useState("Loading neighborhoods…");
@@ -79,6 +83,40 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
   //Serialize source updates so older write cannot finish last
   const sourceWrites = useRef<Promise<void>>(Promise.resolve());
+
+  // A separate noninteractive marker keeps the selection visible above map layers.
+  useEffect(() => {
+    const map = mapRef.current;
+    const record = selectedCrimeIds?.length
+      ? crimesById.current.get(selectedCrimeIds[0])
+      : undefined;
+    if (!map || !record) return;
+
+    const element = document.createElement("div");
+    element.className = "crime-selection-marker";
+    element.setAttribute("aria-hidden", "true");
+    const ring = document.createElement("div");
+    ring.className = "crime-selection-ring";
+    element.appendChild(ring);
+
+    const marker = new maplibregl.Marker({ element, anchor: "center" })
+      .setLngLat(record.geometry.coordinates)
+      .addTo(map);
+
+    const clearOnOutsideClick = (event: maplibregl.MapMouseEvent) => {
+      const hits = map.getLayer("crime-points")
+        ? map.queryRenderedFeatures(event.point, { layers: ["crime-points"] })
+        : [];
+      // Let the existing marker handler select another location.
+      if (hits.length === 0) onClearCrimeSelection();
+    };
+    map.on("click", clearOnOutsideClick);
+
+    return () => {
+      map.off("click", clearOnOutsideClick);
+      marker.remove();
+    };
+  }, [selectedCrimeIds, selectedNeighborhood, onClearCrimeSelection]);
 
 
 
@@ -259,9 +297,9 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
           if (markerAt(event.point)) return;
           const feature = neighborhoods.features.find(item => item.id === event.features?.[0]?.id);
           if (feature) {
+            // Background clicks within the current neighborhood preserve the view.
+            if (map.getFeatureState({ source: "neighborhoods", id: feature.id }).selected) return;
             onSelectNeighborhood(feature);
-            // Also zoom when clicking the already-selected feature.
-            map.fitBounds(neighborhoodBounds(feature), { padding: 40, maxZoom: 16 });
           }
         });
         setNeighborhoodStatus(`${neighborhoods.features.length} planning neighborhoods loaded.`);
@@ -282,58 +320,8 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
         map.addSource("properties", {
           type: "geojson",
           data: geojson,
-
-          cluster: true,
-          clusterMaxZoom: 14,
-          clusterRadius: 50,
+          cluster: false,
         });
-
-        map.addLayer({
-          id: "property-clusters",
-          type: "circle",
-          source: "properties",
-          layout: {
-            visibility: "none",
-          },
-
-          filter: ["has", "point_count"],
-
-          paint: {
-            "circle-radius": [
-              "step",
-              ["get", "point_count"],
-              18,
-              100,
-              24,
-              500,
-              30,
-            ],
-            "circle-color": "#2563eb",
-            "circle-opacity": 0.85,
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 2,
-          }
-        });
-
-        map.addLayer({
-          id: "property-cluster-count",
-          type: "symbol",
-          source: "properties",
-
-          filter: ["has", "point_count"],
-
-          layout: {
-            visibility: "none", // Add this line.
-            "text-field": "{point_count_abbreviated}",
-            "text-size": 12,
-          },
-
-          paint: {
-            "text-color": "#ffffff",
-          }
-        })
-
-
         map.addLayer({
           id: "property-points",
           type: "circle",
@@ -508,14 +496,10 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
     map.on("load", async () => {
       try {
-
-
         map.addSource("crimes", {
           type: "geojson",
           data: EMPTY_POINTS,
-          cluster: true,
-          clusterMaxZoom: 16,
-          clusterRadius: 45,
+          cluster: false,
         });
 
         // Circles representing groups of crime records.
@@ -547,252 +531,48 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
         // Individual records that are not currently clustered.
         map.addLayer({
           id: "crime-points",
-          type: "circle",
+          type: "symbol",
           source: "crimes",
+          filter: [
+            "all",
+            ["!", ["has", "point_count"]],
+            ["==", ["get", "show_location_marker"], true],
+          ],
           layout: {
             visibility: "none",
-          },
-          filter: ["!", ["has", "point_count"]],
-          paint: {
-            "circle-color": "#ea580c",
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12, 4,
-              16, 6,
-              19, 9,
-            ],
-            "circle-opacity": 0.8,
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 1.5,
-          },
-        });
+            "icon-image": ["get", "marker_image"],
+            "icon-size": 1,
+            "icon-anchor": "center",
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+          }
+        })
 
         map.on("click", "crime-points", (event) => {
           const clickedFeature = event.features?.[0];
-
           if (!clickedFeature) return;
 
           const recordId = Number(clickedFeature.properties.record_id);
-
-          // Use original GeoJSON coordinates, avoiding rendered-coordinate rounding.
           const originalFeature = crimesById.current.get(recordId);
-
           if (!originalFeature) return;
 
           const [longitude, latitude] = originalFeature.geometry.coordinates;
-          const key = locationKey(longitude, latitude);
-          const records = crimesByLocation.current.get(key) ?? [];
-
+          const records = crimesByLocation.current.get(
+            locationKey(longitude, latitude),
+          ) ?? [];
           if (records.length === 0) return;
 
-          const container = document.createElement("div");
-          container.style.minWidth = "220px";
-
-          const heading = document.createElement("strong");
-          heading.textContent =
-            records.length === 1
-              ? "1 crime record at this location"
-              : `${records.length.toLocaleString()} crime records at this location`;
-
-          const explanation = document.createElement("p");
-          explanation.textContent =
-            "Approximate mapped location—not an exact incident address.";
-
-          const label = document.createElement("label");
-          label.textContent = "Choose a record: ";
-          label.style.display = "block";
-
-          const select = document.createElement("select");
-          select.style.width = "100%";
-
-          for (const record of records) {
-            const option = document.createElement("option");
-
-            option.value = String(record.properties.record_id);
-            option.textContent = `Record #${record.properties.record_id}`;
-
-            select.appendChild(option);
+          for (const popup of recordPopups.current) {
+            popup.remove();
           }
+          recordPopups.current.clear();
 
-          select.value = String(recordId);
-          label.appendChild(select);
-
-          const selection = document.createElement("p");
-          const detailStatus = document.createElement("p");
-          detailStatus.setAttribute("role", "status");
-
-          const detailContent = document.createElement("div");
-
-          function addDetail(label: string, value: string) {
-            const row = document.createElement("p");
-            row.style.margin = "6px 0";
-
-            const title = document.createElement("strong");
-            title.textContent = `${label}: `;
-
-            row.append(title, document.createTextNode(value));
-            detailContent.appendChild(row);
-          }
-
-          let detailController: AbortController | null = null;
-
-          async function showSelection() {
-            // Stop the previous request when the user changes selection.
-            detailController?.abort();
-
-            const selectedId = Number(select.value);
-            const selected = records.find(
-              (record) => record.properties.record_id === selectedId,
-            );
-
-            if (!selected || crimeController.signal.aborted) return;
-
-            const precision = selected.properties.location_precision;
-
-            selection.textContent =
-              `Selected record #${selectedId}. Location precision: ` +
-              (precision === "block_approximate"
-                ? "approximate block location."
-                : precision === "intersection_approximate"
-                  ? "approximate intersection location."
-                  : precision);
-
-            detailContent.replaceChildren();
-            detailStatus.textContent = "Loading record details…";
-
-            const controller = new AbortController();
-            detailController = controller;
-
-            try {
-              const details = await fetchCrimeDetails(
-                selectedId,
-                controller.signal,
-              );
-
-              // An older response must not replace the current selection.
-              if (
-                controller.signal.aborted ||
-                crimeController.signal.aborted ||
-                detailController !== controller
-              ) {
-                return;
-              }
-
-              detailStatus.textContent = "";
-              detailContent.replaceChildren();
-
-              addDetail("Record", String(details.record_id));
-
-              addDetail(
-                "Offense",
-                details.offense?.trim() || "Not provided",
-              );
-
-              let reportedDate = "Not provided";
-
-              if (details.date_reported) {
-                const parsedDate = new Date(details.date_reported);
-
-                if (!Number.isNaN(parsedDate.getTime())) {
-                  reportedDate = new Intl.DateTimeFormat("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                    timeZone: "America/New_York",
-                    timeZoneName: "short",
-                  }).format(parsedDate);
-                } else {
-                  reportedDate = "Unavailable";
-                }
-              }
-
-              addDetail("Reported", reportedDate);
-
-              addDetail(
-                "Street",
-                details.street_name?.trim() || "Not provided",
-              );
-
-              addDetail(
-                "Block",
-                details.block_number !== null
-                  ? String(details.block_number)
-                  : "Not provided",
-              );
-
-              const precisionLabel =
-                details.location_precision === "block_approximate"
-                  ? "Approximate block location"
-                  : details.location_precision === "intersection_approximate"
-                    ? "Approximate intersection location"
-                    : "Precision unavailable";
-
-              addDetail("Location precision", precisionLabel);
-            } catch (error) {
-              if (
-                controller.signal.aborted ||
-                crimeController.signal.aborted ||
-                detailController !== controller
-              ) {
-                return;
-              }
-
-              detailStatus.textContent =
-                error instanceof Error
-                  ? error.message
-                  : "Could not load crime details.";
-            }
-          }
-
-          select.addEventListener("change", () => {
-            void showSelection();
-          });
-
-          container.append(
-            heading,
-            explanation,
-            label,
-            selection,
-            detailStatus,
-            detailContent,
-          );
-
-          const popup = new maplibregl.Popup({
-            offset: 12,
-            maxWidth: "340px",
-          })
-            .setLngLat([longitude, latitude])
-            .setDOMContent(container)
-            .addTo(map);
-
-          recordPopups.current.add(popup);
-
-          function cancelDetails() {
-            detailController?.abort();
-          }
-
-          // Cancel pending details when the component unmounts.
-          crimeController.signal.addEventListener(
-            "abort",
-            cancelDetails,
-            { once: true },
-          );
-
-          // Also cancel when this popup closes.
-          popup.on("close", () => {
-            recordPopups.current.delete(popup);
-            cancelDetails();
-            crimeController.signal.removeEventListener(
-              "abort",
-              cancelDetails,
-            );
-          });
-
-          void showSelection();
+          const recordIds = [...new Set(
+            records.map(record => record.properties.record_id),
+          )].sort((a, b) => a - b);
+          onSelectCrimeLocation(recordIds, Object.fromEntries(
+            records.map(record => [record.properties.record_id, record.properties.category ?? "other"]),
+          ));
         });
 
         map.on("click", "crime-clusters", async (event) => {
@@ -862,7 +642,7 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
       mapRef.current = null;
       map.remove();
     };
-  }, [onSelectNeighborhood]);
+  }, [onSelectNeighborhood, onSelectCrimeLocation]);
   useEffect(() => {
     const currentMap = mapRef.current;
     if (!currentMap) return;
@@ -957,7 +737,8 @@ function MapView({ selectedNeighborhood, onSelectNeighborhood }: Props) {
 
         if (!isCurrent()) return;
 
-        await writeSources(properties, crimes);
+        const crimeMarkers = prepareCrimeMarkers(map, crimes);
+        await writeSources(properties, crimeMarkers);
         if (!isCurrent()) return;
 
         for (const feature of crimes.features) {

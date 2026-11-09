@@ -14,3 +14,13 @@ python -m pip freeze > requirements.txt
 
 
 psql -U postgres -h localhost -d charlottesville_real_estate
+
+2.6 — Connect neighborhood selection to the overview API
+[ ] Listen for changes to the selected neighborhood ID.
+[ ] Fetch the neighborhood overview when a new neighborhood is selected.
+[ ] Use React Query/TanStack Query or the existing fetching pattern to manage loading and caching.
+[ ] Cancel or ignore outdated requests when users rapidly switch neighborhoods.
+[ ] Update all summary metrics and category bars using the API response.
+[ ] Keep the existing property points, crime markers, and selected neighborhood boundary working.
+[ ] Reuse the same neighborhood ID and crime date filter across map layers and summary statistics.
+[ ] Make clear when displayed crime counts include records without precise point locations.

@@ -10,6 +10,7 @@ export type CrimeFeature = {
   properties: {
     record_id: number;
     location_precision: string;
+    category?: string;
   };
 };
 
@@ -48,12 +49,16 @@ export async function fetchMapCrimes(
 export type CrimeDetails = {
   record_id: number;
   offense: string | null;
-  date_reported: string | null;
+  incident_id: string | null;
   block_number: number | null;
   street_name: string | null;
+  agency: string | null;
+  date_reported: string | null;
+  hour_reported: number | null;
+  reporting_officer: string | null;
   latitude: number | null;
   longitude: number | null;
-  mapping_method: string | null;
+  mapping_method: string |null;
   location_precision: string | null;
 };
 
