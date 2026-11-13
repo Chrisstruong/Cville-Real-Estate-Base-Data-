@@ -1,0 +1,177 @@
+.explorer-ai {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid #dce3df;
+  background: #fbfcfa;
+  color: #263e32;
+  color-scheme: light;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.explorer-ai[hidden] {
+  display: none;
+}
+
+.explorer-ai *,
+.explorer-ai *::before,
+.explorer-ai *::after {
+  box-sizing: border-box;
+}
+
+.explorer-ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #dce3df;
+  background: #f0f5f1;
+}
+
+.explorer-ai-header h2 {
+  margin: 0 0 4px;
+  color: #263e32;
+  font-size: 18px;
+}
+
+.explorer-ai-header p,
+.explorer-ai-composer > p {
+  color: #52685a;
+  font-size: 12px;
+}
+
+.explorer-ai button {
+  padding: 8px 12px;
+  border: 1px solid #c6d3c9;
+  border-radius: 6px;
+  background: white;
+  color: #263e32;
+  font: inherit;
+  cursor: pointer;
+}
+
+.explorer-ai-header > button {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 22px;
+}
+
+.explorer-ai button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.explorer-ai button:focus-visible,
+.explorer-ai textarea:focus-visible {
+  outline: 3px solid #527863;
+  outline-offset: 2px;
+}
+
+.explorer-ai-preview {
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid #dce3df;
+  color: #52685a;
+  font-size: 12px;
+}
+
+.explorer-ai-header,
+.explorer-ai-preview,
+.explorer-ai-composer {
+  flex-shrink: 0;
+}
+
+.explorer-ai-history {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+}
+
+.explorer-ai-suggestions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.explorer-ai-suggestions button {
+  text-align: left;
+}
+
+.explorer-ai-message {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #dce3df;
+  border-radius: 8px;
+  background: white;
+  overflow-wrap: anywhere;
+}
+
+.explorer-ai-message.is-user {
+  margin-left: 24px;
+  background: #edf3ee;
+}
+
+.explorer-ai-message.is-assistant {
+  margin-right: 12px;
+}
+
+.explorer-ai-message strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.explorer-ai-message p {
+  white-space: pre-wrap;
+}
+
+.explorer-ai-error {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #c98275;
+  border-radius: 6px;
+}
+
+.explorer-ai-error button {
+  margin-top: 8px;
+}
+
+.explorer-ai-composer {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid #dce3df;
+}
+
+.explorer-ai-composer textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 180px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid #c6d3c9;
+  border-radius: 6px;
+  background: white;
+  color: #263e32;
+  font: inherit;
+}
+
+.explorer-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .explorer-ai {
+    border-left: 0;
+    border-top: 1px solid #dce3df;
+  }
+}

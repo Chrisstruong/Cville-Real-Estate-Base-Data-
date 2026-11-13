@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from 'maplibre-gl';
 import "maplibre-gl/dist/maplibre-gl.css";
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import type { FeatureCollection, Point } from "geojson";
+import type { FeatureCollection, LineString, Point } from "geojson";
+import type { StreetCrimeResult } from "../api/streetCrimes";
+import type { MapContext } from "../api/chatContext";
 
 import { fetchPropertyByParcelNumber } from "../api/properties";
 import type { CrimeFeature } from "../api/crimes";
@@ -28,11 +30,13 @@ const NEIGHBORHOOD_PALETTE = [
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 type Props = {
+  streetResult: StreetCrimeResult | null;
   selectedCrimeIds: number[] | null;
   selectedNeighborhood: NeighborhoodFeature | null;
   onSelectNeighborhood: (feature: NeighborhoodFeature) => void;
   onSelectCrimeLocation: (recordIds: number[], categories: Record<number, string>) => void;
   onClearCrimeSelection: () => void;
+  onMapContextChange: (context: MapContext | null) => void;
 };
 const DETAIL_LAYERS = [
   "property-clusters",
@@ -63,7 +67,15 @@ function setDetailVisibility(
   }
 }
 
-function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood, onSelectCrimeLocation, onClearCrimeSelection, }: Props) {
+function MapView({
+  streetResult,
+  selectedNeighborhood,
+  selectedCrimeIds,
+  onSelectNeighborhood,
+  onSelectCrimeLocation,
+  onClearCrimeSelection,
+  onMapContextChange,
+}: Props) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [neighborhoodStatus, setNeighborhoodStatus] = useState("Loading neighborhoods…");
@@ -122,21 +134,93 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
 
 
   // Synchronize React selection with the existing map, without rebuilding it.
+  const savedNeighborhoodView = useRef<{
+    neighborhoodId: number | null;
+    center: [number, number];
+    zoom: number;
+    bearing: number;
+    pitch: number;
+  } | null>(null);
+
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map?.getSource("neighborhoods")) return;
-    if (!selectedNeighborhood) {
-      map.easeTo({ center: [-78.4767, 38.0293], zoom: 12 });
-      return;
+    const currentMap = mapRef.current;
+    if (!currentMap) return;
+
+    const map: maplibregl.Map = currentMap;
+    let applied = false;
+
+    function applyCamera() {
+      if (applied || !map.getSource("neighborhoods")) return;
+      applied = true;
+
+      if (streetResult) {
+        if (savedNeighborhoodView.current === null) {
+          const center = map.getCenter();
+
+          savedNeighborhoodView.current = {
+            neighborhoodId: selectedNeighborhood?.id ?? null,
+            center: [center.lng, center.lat],
+            zoom: map.getZoom(),
+            bearing: map.getBearing(),
+            pitch: map.getPitch(),
+          };
+        }
+
+        map.fitBounds(streetBounds(streetResult.road_blocks), {
+          padding: 60,
+          maxZoom: 16,
+        });
+        return;
+      }
+
+      if (selectedNeighborhood) {
+        map.setFeatureState(
+          { source: "neighborhoods", id: selectedNeighborhood.id },
+          { selected: true },
+        );
+      }
+
+      const saved = savedNeighborhoodView.current;
+      savedNeighborhoodView.current = null;
+
+      if (
+        saved &&
+        saved.neighborhoodId === (selectedNeighborhood?.id ?? null)
+      ) {
+        map.easeTo({
+          center: saved.center,
+          zoom: saved.zoom,
+          bearing: saved.bearing,
+          pitch: saved.pitch,
+        });
+      } else if (selectedNeighborhood) {
+        map.fitBounds(neighborhoodBounds(selectedNeighborhood), {
+          padding: 40,
+          maxZoom: 16,
+        });
+      } else {
+        map.easeTo({ center: [-78.4767, 38.0293], zoom: 12 });
+      }
     }
-    map.setFeatureState({ source: "neighborhoods", id: selectedNeighborhood.id }, { selected: true });
-    map.fitBounds(neighborhoodBounds(selectedNeighborhood), { padding: 40, maxZoom: 16 });
+
+    map.on("styledata", applyCamera);
+    applyCamera();
+
     return () => {
-      if (mapRef.current === map && map.getSource("neighborhoods")) {
-        map.setFeatureState({ source: "neighborhoods", id: selectedNeighborhood.id }, { selected: false });
+      map.off("styledata", applyCamera);
+
+      if (
+        selectedNeighborhood &&
+        mapRef.current === map &&
+        map.getSource("neighborhoods")
+      ) {
+        map.setFeatureState(
+          { source: "neighborhoods", id: selectedNeighborhood.id },
+          { selected: false },
+        );
       }
     };
-  }, [selectedNeighborhood]);
+  }, [selectedNeighborhood, streetResult]);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -312,6 +396,32 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
 
     map.on("load", async () => {
       try {
+        map.addSource("street-roads", {
+          type: "geojson",
+          data: EMPTY_ROADS,
+        });
+
+        map.addLayer({
+          id: "street-road-highlight",
+          type: "line",
+          source: "street-roads",
+          layout: {
+            visibility: "none",
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#2563eb",
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12, 4,
+              16, 7,
+            ],
+            "line-opacity": 0.8,
+          },
+        });
         const geojson: FeatureCollection<Point> = {
           type: "FeatureCollection",
           features: [],
@@ -671,9 +781,17 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
       recordPopups.current.clear();
     }
 
-    // Hide immediately; setData is asynchronous.
+    // Do not expose an unfinished map transition as active chat context.
+    onMapContextChange(null);
+
+    // Hide while replacing source data; prevent old selections from leaking.
     setDetailVisibility(map, false);
     clearLookupsAndPopups();
+    onClearCrimeSelection();
+
+    if (map.getLayer("street-road-highlight")) {
+      map.setLayoutProperty("street-road-highlight", "visibility", "none");
+    }
 
     async function startLoading() {
       if (started || !isCurrent()) return;
@@ -686,7 +804,18 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
         "crimes",
       ) as maplibregl.GeoJSONSource | undefined;
 
-      if (!propertiesSource || !crimesSource) return;
+      const roadsSource = map.getSource(
+        "street-roads",
+      ) as maplibregl.GeoJSONSource | undefined;
+
+      if (
+        !propertiesSource ||
+        !crimesSource ||
+        !roadsSource ||
+        !map.getLayer("neighborhood-labels")
+      ) {
+        return;
+      }
 
       started = true;
       setRecordsError(false);
@@ -694,6 +823,7 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
       function writeSources(
         properties: FeatureCollection<Point>,
         crimes: FeatureCollection<Point>,
+        roads: FeatureCollection<LineString> = EMPTY_ROADS,
       ) {
         const operation = sourceWrites.current.then(async () => {
           if (!isCurrent()) return;
@@ -701,6 +831,7 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
           const results = await Promise.allSettled([
             propertiesSource!.setData(properties),
             crimesSource!.setData(crimes),
+            roadsSource!.setData(roads),
           ]);
 
           for (const result of results) {
@@ -719,26 +850,42 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
         await writeSources(EMPTY_POINTS, EMPTY_POINTS);
         if (!isCurrent()) return;
 
-        if (!selectedNeighborhood) {
+        if (!streetResult && !selectedNeighborhood) {
+          setNeighborhoodVisibility(map, true);
           setRecordsStatus("");
+          onMapContextChange({ mode: "city" });
           return;
         }
 
-        const id = selectedNeighborhood.id;
-        const name = selectedNeighborhood.properties.NAME;
+        const name = streetResult
+          ? streetResult.street.name
+          : selectedNeighborhood!.properties.NAME;
 
-        setRecordsStatus(`Loading properties and crime records for ${name}…`);
+        setRecordsStatus(`Loading map records for ${name}…`);
 
-        // Both must succeed before either dataset becomes visible.
-        const [properties, crimes] = await Promise.all([
-          fetchNeighborhoodProperties(id, controller.signal),
-          fetchNeighborhoodCrimes(id, controller.signal),
-        ]);
+        const [properties, crimes] = streetResult
+          ? [EMPTY_POINTS, streetResult.crimes] as const
+          : await Promise.all([
+            fetchNeighborhoodProperties(
+              selectedNeighborhood!.id,
+              controller.signal,
+            ),
+            fetchNeighborhoodCrimes(
+              selectedNeighborhood!.id,
+              controller.signal,
+            ),
+          ]);
 
         if (!isCurrent()) return;
 
         const crimeMarkers = prepareCrimeMarkers(map, crimes);
-        await writeSources(properties, crimeMarkers);
+
+        await writeSources(
+          properties,
+          crimeMarkers,
+          streetResult?.road_blocks ?? EMPTY_ROADS,
+        );
+
         if (!isCurrent()) return;
 
         for (const feature of crimes.features) {
@@ -759,11 +906,43 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
         const crimeCount = crimes.features.length;
 
         setDetailVisibility(map, true);
+        setNeighborhoodVisibility(map, streetResult === null);
 
-        setRecordsStatus(
-          `${name}: ` +
-          `${propertyCount === 0 ? "No properties" : `${propertyCount.toLocaleString()} properties`}; ` +
-          `${crimeCount === 0 ? "no mapped crime records" : `${crimeCount.toLocaleString()} mapped crime records`}.`,
+        map.setLayoutProperty(
+          "street-road-highlight",
+          "visibility",
+          streetResult ? "visible" : "none",
+        );
+
+        if (streetResult) {
+          map.setLayoutProperty("property-points", "visibility", "none");
+
+          setRecordsStatus(
+            `${name}: ` +
+            `${streetResult.summary.associated_record_count.toLocaleString()} associated records; ` +
+            `${streetResult.summary.mapped_record_count.toLocaleString()} mapped; ` +
+            `${streetResult.summary.unmapped_record_count.toLocaleString()} without usable coordinates. ` +
+            "Locations may be approximate.",
+          );
+        } else {
+          setRecordsStatus(
+            `${name}: ` +
+            `${propertyCount.toLocaleString()} properties; ` +
+            `${crimeCount.toLocaleString()} mapped crime records.`,
+          );
+        }
+
+        onMapContextChange(
+          streetResult
+            ? {
+              mode: "street",
+              street_id: streetResult.street.street_id,
+              filters: { ...streetResult.filters },
+            }
+            : {
+              mode: "neighborhood",
+              neighborhood_id: selectedNeighborhood!.id,
+            },
         );
       } catch (error) {
         if (!isCurrent()) return;
@@ -801,6 +980,7 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
     void startLoading();
 
     return () => {
+      onMapContextChange(null);
       controller.abort();
       recordsVersion.current = version + 1;
       map.off("styledata", onStyleData);
@@ -811,7 +991,12 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
 
       clearLookupsAndPopups();
     };
-  }, [selectedNeighborhood]);
+  }, [
+    selectedNeighborhood,
+    streetResult,
+    onClearCrimeSelection,
+    onMapContextChange,
+  ]);
 
 
 
@@ -832,6 +1017,50 @@ function MapView({ selectedNeighborhood, selectedCrimeIds, onSelectNeighborhood,
       />
     </section>
   );
+}
+
+const EMPTY_ROADS: FeatureCollection<LineString> = {
+  type: "FeatureCollection",
+  features: [],
+};
+
+const NEIGHBORHOOD_LAYERS = [
+  "neighborhood-fills",
+  "neighborhood-outlines",
+  "neighborhood-labels",
+];
+
+function setNeighborhoodVisibility(
+  map: maplibregl.Map,
+  visible: boolean,
+) {
+  for (const id of NEIGHBORHOOD_LAYERS) {
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(
+        id,
+        "visibility",
+        visible ? "visible" : "none",
+      );
+    }
+  }
+}
+
+function streetBounds(
+  roads: StreetCrimeResult["road_blocks"],
+): maplibregl.LngLatBounds {
+  const bounds = new maplibregl.LngLatBounds();
+
+  for (const feature of roads.features) {
+    for (const coordinate of feature.geometry.coordinates) {
+      bounds.extend([coordinate[0], coordinate[1]]);
+    }
+  }
+
+  if (bounds.isEmpty()) {
+    throw new Error("No street bounds are available.");
+  }
+
+  return bounds;
 }
 
 export default MapView;

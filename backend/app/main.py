@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from psycopg.rows import dict_row  # Return query results as dictionary-like rows
@@ -8,12 +8,24 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agents import set_default_openai_key
 from app.config import settings
-from app.services.agent_service import run_real_estate_agent, stream_real_estate_agent
+from app.chat_context import ConversationContext
+from app.map_actions import ChatResponse, ShowStreetCrimesAction
+from app.services.agent_service import (
+    run_real_estate_agent,
+    stream_real_estate_agent,
+    stream_real_estate_events,
+)
 from app.services.crime_service import fetch_map_crimes, fetch_crime_by_record_id
+from app.services.street_crimes import fetch_street_crimes
+from app.chat_context_service import validate_conversation_context
 from app.services.neighborhoods import fetch_neighborhood_records
 from app.neighborhood_overview import router as neighborhood_overview_router
 
 import time
+import logging
+
+from psycopg import OperationalError
+from psycopg_pool import PoolTimeout
 
 from pydantic import (
     BaseModel,
@@ -119,6 +131,9 @@ class ChatRequest(BaseModel):
         min_length=1,
         max_length=2000,
     )
+    conversation: ConversationContext = Field(
+        default_factory=ConversationContext,
+    )
 
     @field_validator("message")
     @classmethod
@@ -153,7 +168,7 @@ async def property_by_parcel_number(parcel_number: str):
     return property_data
 
 
-@app.post("/api/chat")
+@app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     start_time = time.perf_counter()
     answer = await run_real_estate_agent(request.message)
@@ -164,17 +179,79 @@ async def chat(request: ChatRequest):
     print(f"Total response time: {total_time:.3f}s")
     print("==========\n")
 
-    return {
-        "answer": answer,
-        "total_time_seconds": round(total_time, 3),
-    }
+    return ChatResponse(
+        answer=answer,
+        total_time_seconds=round(total_time, 3),
+    )
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(
+    request: ChatRequest,
+    response_format: Annotated[
+        Literal["text", "ndjson"],
+        Query(),
+    ] = "text",
+):
+    if response_format == "ndjson":
+        try:
+            conversation, active_street_name = await validate_conversation_context(
+                request.conversation
+            )
+        except (OperationalError, PoolTimeout):
+            logging.getLogger(__name__).exception(
+                "Database unavailable while validating chat context."
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Database temporarily unavailable. Please try again.",
+            ) from None
+
+        return StreamingResponse(
+            stream_real_estate_events(
+                request.message,
+                conversation=conversation,
+                active_street_name=active_street_name,
+            ),
+            media_type="application/x-ndjson",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     return StreamingResponse(
-        stream_real_estate_agent(request.message), media_type="text/plain"
+        stream_real_estate_agent(request.message),
+        media_type="text/plain",
     )
+
+
+@app.post("/api/streets/crimes/query")
+async def street_crime_query(request: ShowStreetCrimesAction):
+    try:
+        return await fetch_street_crimes(
+            street_id=request.street_id,
+            filters=request.filters,
+        )
+
+    except HTTPException:
+        raise
+
+    except (OperationalError, PoolTimeout):
+        logging.getLogger(__name__).exception(
+            "Database unavailable during street crime query."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Database temporarily unavailable. Please try again.",
+        ) from None
+
+    except Exception:
+        logging.getLogger(__name__).exception("Street crime query failed.")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not load street crime results.",
+        ) from None
 
 
 @app.get("/api/test-property-street")

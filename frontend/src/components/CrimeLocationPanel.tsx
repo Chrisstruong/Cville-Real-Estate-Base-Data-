@@ -8,7 +8,8 @@ import "./CrimeLocationPanel.css";
 type Props = {
   recordIds: number[];
   categories: Record<number, string>;
-  neighborhoodName: string;
+  contextName: string;
+  backLabel: string;
   onBack: () => void;
   onClose: () => void;
 };
@@ -146,7 +147,14 @@ function RecordPage({
   );
 }
 
-export default function CrimeLocationPanel({ recordIds, categories, neighborhoodName, onBack, onClose }: Props) {
+export default function CrimeLocationPanel({
+  recordIds,
+  categories,
+  contextName,
+  backLabel,
+  onBack,
+  onClose,
+}: Props) {
   const [page, setPage] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<number | null>(null);
@@ -155,10 +163,17 @@ export default function CrimeLocationPanel({ recordIds, categories, neighborhood
     <aside className="crime-location-panel" aria-labelledby="crime-location-title">
       <header className="crime-location-header">
         <div className="crime-location-title-row">
-          <div><p className="incident-secondary">{neighborhoodName}</p><h2 id="crime-location-title">Records at this location</h2><p className="incident-secondary">{recordIds.length.toLocaleString()} {recordIds.length === 1 ? "record" : "records"}</p></div>
+          <div><p className="incident-secondary">{contextName}</p><h2 id="crime-location-title">Records at this location</h2><p className="incident-secondary">{recordIds.length.toLocaleString()} {recordIds.length === 1 ? "record" : "records"}</p></div>
           <button type="button" className="crime-location-close" aria-label="Close crime location overview" onClick={onClose}><FontAwesomeIcon icon={faXmark} /></button>
         </div>
-        <button type="button" className="crime-location-back" onClick={onBack}><FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" /> Back to neighborhood</button>
+        <button
+          type="button"
+          className="crime-location-back"
+          onClick={onBack}
+        >
+          <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
+          {backLabel}
+        </button>
         <p className="crime-location-notice">Locations may be approximate. Records may include service calls and police activity.</p>
       </header>
       <div className="crime-location-list" role="region" aria-label="Incident records" tabIndex={0}>
